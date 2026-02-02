@@ -5,10 +5,6 @@ summary: "Importing world assets and building a performant collision and physics
 order: 5
 ---
 
-# Devlog 05 – World Assets, Collisions & Physical Feedback
-
-Date: 2026-02-04
-
 ## 🎯 Goal
 Build the physical foundation of the game world by importing environment assets and defining how objects collide, react to bullets, and communicate weight, resistance, and impact feedback.
 
@@ -37,6 +33,8 @@ Imported a wide range of world assets, including:
 - Environmental props and debris
 
 These assets form the basis of the playable environment and testing areas.
+
+![Assets Showcase](/devlog-assets/05_2.png)
 
 ---
 
@@ -133,7 +131,6 @@ This significantly improves hit feedback and makes combat interactions easier to
 - A solid physical sandbox for future combat systems
 
 ![Training Ground Testing](/devlog-assets/05_1.mp4)
-![Assets Showcase](/devlog-assets/05_2.png)
 ---
 
 ## 📈 Engineering Takeaways
