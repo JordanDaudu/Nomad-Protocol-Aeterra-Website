@@ -13,7 +13,6 @@ declare module "http" {
   }
 }
 
-// Parse JSON and store raw body
 app.use(
     express.json({
       verify: (req, _res, buf) => {
@@ -21,24 +20,18 @@ app.use(
       },
     }),
 );
+
 app.use(express.urlencoded({ extended: false }));
 
-// Serve gallery images
-app.use(
-    "/gallery-images",
-    express.static(path.join(process.cwd(), "content", "gallery")),
-);
+// Serve gallery images from content/gallery
+app.use('/gallery-images', express.static(path.join(process.cwd(), 'content', 'gallery')));
 
-// Serve devlog assets
-app.use(
-    "/devlog-assets",
-    express.static(path.join(process.cwd(), "attached_assets", "devlog_assets")),
-);
+// Serve devlog assets (images, gifs, videos)
+app.use('/devlog-assets', express.static(path.join(process.cwd(), 'attached_assets', 'devlog_assets')));
 
 // Serve audio files
-app.use("/audio", express.static(path.join(process.cwd(), "attached_assets", "audio")));
+app.use('/audio', express.static(path.join(process.cwd(), 'attached_assets', 'audio')));
 
-// Simple logging middleware
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -92,23 +85,20 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
-  // Serve static client files
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
-    // Serve built React/Vite client
-    const staticPath = path.join(__dirname, "public"); // points to dist/public after build
-    app.use(express.static(staticPath));
-
-    // Return index.html for all non-API routes (React routing)
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(staticPath, "index.html"));
-    });
+    serveStatic(app);
   } else {
-    // Use Vite dev server in development
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
 
-  // Start server
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5000 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
       {
