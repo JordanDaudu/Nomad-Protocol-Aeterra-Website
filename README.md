@@ -423,6 +423,28 @@ order: 0   # This appears first
 
 ---
 
+## 🖥️ Running Locally
+
+1️⃣ Install Dependencies
+```
+npm install
+```
+2️⃣ Development Mode
+```
+npm run dev
+```
+3️⃣ Production Mode (full build)
+- Windows (PowerShell):
+```
+npm run build
+$env:NODE_ENV="production"; npm start
+```
+- macOS / Linux:
+```
+npm run build
+NODE_ENV=production npm start
+```
+---
 ## 📜 License
 
 This project is part of the Nomad Protocol development documentation.
