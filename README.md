@@ -21,7 +21,7 @@ The site uses a **file-based content management system** - simply drop Markdown 
 ## 📂 Project Structure
 
 ```
-/content                    # <-- YOUR CONTENT LIVES HERE
+/content
   /devlogs                  # Development log markdown files
     00-project-bootstrap.md
     01-movement-system.md
@@ -433,6 +433,8 @@ npm install
 ```
 npm run dev
 ```
+Should be available at http://localhost:5000
+
 3️⃣ Production Mode (full build)
 - Windows (PowerShell):
 ```

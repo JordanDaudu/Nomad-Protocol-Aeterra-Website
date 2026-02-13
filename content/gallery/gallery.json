@@ -1,7 +1,7 @@
 [
   {
     "id": "img-01",
-    "filename": "Nomad_Protocol_Aeterra_Banner.png",
+    "filename": "Nomad_Protocol_Aeterra_Banner_Higher_Quality.png",
     "caption": "Nomad Protocol Aeterra Banner",
     "type": "image"
   },
@@ -9,6 +9,24 @@
     "id": "img-02",
     "filename": "Title Banner.png",
     "caption": "Title Banner",
+    "type": "image"
+  },
+  {
+    "id": "img-03",
+    "filename": "Aeterra_System.png",
+    "caption": "Aeterra System",
+    "type": "image"
+  },
+  {
+    "id": "img-04",
+    "filename": "The_Orbital_Ark.png",
+    "caption": "The Orbital Ark",
+    "type": "image"
+  },
+  {
+    "id": "img-05",
+    "filename": "The_Refresh_Cycle.png",
+    "caption": "The Refresh Cycle",
     "type": "image"
   }
 ]

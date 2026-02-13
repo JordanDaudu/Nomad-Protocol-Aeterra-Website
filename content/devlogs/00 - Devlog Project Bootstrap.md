@@ -10,7 +10,7 @@ Set up the **project structure**, **repository**, and **documentation foundation
 
 ## 🧠 Design Approach
 Before writing gameplay code, the focus was on treating the project as a **software system** rather than a prototype.  
-The goal was to establish clear boundaries between **systems**, prepare **documentation containers**, and ensure the project could scale without **structural refactors** later.
+The goal was to establish clear boundaries between **systems**, prepare **documentation containers**, and ensure the project could scale with minimal **structural refactors** later.
 
 Key principles:
 
