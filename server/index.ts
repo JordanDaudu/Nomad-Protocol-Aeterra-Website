@@ -98,12 +98,7 @@ app.use((req, res, next) => {
   // -------------------- CROSS-PLATFORM SERVER LISTEN --------------------
   const port = parseInt(process.env.PORT || "5000", 10);
 
-  const listenOptions: any =
-      process.platform === "win32"
-          ? port // Windows only supports a simple port number
-          : { port, host: "0.0.0.0", reusePort: true };
-
-  httpServer.listen(listenOptions, () => {
-    log(`serving on port ${port}`);
+  httpServer.listen(port, () => {
+    log(`serving on http://localhost:${port}`);
   });
 })();

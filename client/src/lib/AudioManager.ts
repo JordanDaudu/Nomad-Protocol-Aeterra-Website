@@ -1,4 +1,9 @@
-import { AUDIO_TRACKS, getTrackForRoute, getTrackIdForRoute, type AudioTrack } from "./audioTracks";
+import {
+  AUDIO_TRACKS,
+  getTrackForRoute,
+  getTrackIdForRoute,
+  type AudioTrack,
+} from "./audioTracks";
 
 const MUTE_STORAGE_KEY = "nomad-protocol-audio-muted";
 const FADE_DURATION = 1500;
@@ -21,6 +26,9 @@ class AudioManager {
   private isUnlocked: boolean = false;
   private listeners: Set<(muted: boolean) => void> = new Set();
 
+  // Remember per-track playback position so each OST resumes
+  private trackPositions: Record<string, number> = {};
+
   constructor() {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem(MUTE_STORAGE_KEY);
@@ -37,7 +45,8 @@ class AudioManager {
   }
 
   private createAudioContext(): AudioContext {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass =
+        window.AudioContext || (window as any).webkitAudioContext;
     return new AudioContextClass();
   }
 
@@ -53,7 +62,7 @@ class AudioManager {
     return {
       audio,
       source: null,
-      gainNode: null
+      gainNode: null,
     };
   }
 
@@ -116,7 +125,10 @@ class AudioManager {
           await this.channelA.audio.play();
           if (this.channelA.gainNode && this.audioContext) {
             const track = AUDIO_TRACKS.default;
-            this.channelA.gainNode.gain.setValueAtTime(track.volume, this.audioContext.currentTime);
+            this.channelA.gainNode.gain.setValueAtTime(
+                track.volume,
+                this.audioContext.currentTime
+            );
           }
         } catch (e) {
           this.autoplayBlocked = true;
@@ -136,7 +148,10 @@ class AudioManager {
         await this.channelA.audio.play();
         if (this.channelA.gainNode && this.audioContext) {
           const track = AUDIO_TRACKS.default;
-          this.channelA.gainNode.gain.setValueAtTime(track.volume, this.audioContext.currentTime);
+          this.channelA.gainNode.gain.setValueAtTime(
+              track.volume,
+              this.audioContext.currentTime
+          );
         }
       } catch (e) {
         this.autoplayBlocked = true;
@@ -184,13 +199,16 @@ class AudioManager {
 
     if (!fadeOutChannel || !fadeInChannel || !this.audioContext) return;
 
+    const outgoingTrackId = this.currentTrackId; // track we are leaving
     const targetVolume = this.isMuted ? 0 : track.volume;
     const halfDurationSec = FADE_DURATION / 2000;
 
     // Prepare and preload the new track
     fadeInChannel.audio.src = track.src;
     fadeInChannel.audio.loop = track.loop;
-    fadeInChannel.audio.currentTime = 0;
+
+    // Resume where we left off (default: 0)
+    const resumeTime = this.trackPositions[trackId] ?? 0;
 
     // Set initial gain to 0 for fade-in channel
     if (fadeInChannel.gainNode) {
@@ -200,17 +218,35 @@ class AudioManager {
     // Wait for the new track to be ready
     await new Promise<void>((resolve) => {
       let resolved = false;
-      const onCanPlay = () => {
-        if (!resolved) {
-          resolved = true;
-          fadeInChannel.audio.removeEventListener("canplaythrough", onCanPlay);
-          resolve();
-        }
+
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        fadeInChannel.audio.removeEventListener("canplaythrough", onCanPlay);
+        resolve();
       };
+
+      const onCanPlay = () => finish();
+
       fadeInChannel.audio.addEventListener("canplaythrough", onCanPlay);
       fadeInChannel.audio.load();
-      setTimeout(() => { if (!resolved) { resolved = true; resolve(); } }, 1500);
+
+      // Fallback timeout in case canplaythrough doesn't fire
+      setTimeout(finish, 1500);
     });
+
+    // Only after it has loaded enough, set currentTime (safe on most browsers)
+    try {
+      const dur = fadeInChannel.audio.duration;
+      const safeTime =
+          Number.isFinite(dur) && dur > 0
+              ? Math.min(Math.max(resumeTime, 0), Math.max(0, dur - 0.05))
+              : Math.max(resumeTime, 0);
+
+      fadeInChannel.audio.currentTime = safeTime;
+    } catch {
+      // If setting currentTime fails, it will just start from 0
+    }
 
     // Phase 1: Fade out current track using Web Audio scheduling
     const fadeOutStartTime = this.audioContext.currentTime;
@@ -219,13 +255,19 @@ class AudioManager {
       const currentGain = fadeOutChannel.gainNode.gain.value;
       fadeOutChannel.gainNode.gain.cancelScheduledValues(fadeOutStartTime);
       fadeOutChannel.gainNode.gain.setValueAtTime(currentGain, fadeOutStartTime);
-      fadeOutChannel.gainNode.gain.linearRampToValueAtTime(0, fadeOutStartTime + halfDurationSec);
+      fadeOutChannel.gainNode.gain.linearRampToValueAtTime(
+          0,
+          fadeOutStartTime + halfDurationSec
+      );
     }
 
-    // Wait for fade out to complete using a promise that resolves based on AudioContext time
+    // Wait for fade out to complete using AudioContext time
     await new Promise<void>((resolve) => {
       const checkTime = () => {
-        if (this.audioContext && this.audioContext.currentTime >= fadeOutStartTime + halfDurationSec) {
+        if (
+            this.audioContext &&
+            this.audioContext.currentTime >= fadeOutStartTime + halfDurationSec
+        ) {
           resolve();
         } else {
           requestAnimationFrame(checkTime);
@@ -233,6 +275,16 @@ class AudioManager {
       };
       requestAnimationFrame(checkTime);
     });
+
+    // Save outgoing position right before stopping
+    try {
+      const t = fadeOutChannel.audio.currentTime;
+      if (Number.isFinite(t) && t >= 0) {
+        this.trackPositions[outgoingTrackId] = t;
+      }
+    } catch {
+      // ignore
+    }
 
     // Stop the old track
     fadeOutChannel.audio.pause();
@@ -254,13 +306,19 @@ class AudioManager {
     if (fadeInChannel.gainNode) {
       fadeInChannel.gainNode.gain.cancelScheduledValues(fadeInStartTime);
       fadeInChannel.gainNode.gain.setValueAtTime(0, fadeInStartTime);
-      fadeInChannel.gainNode.gain.linearRampToValueAtTime(targetVolume, fadeInStartTime + halfDurationSec);
+      fadeInChannel.gainNode.gain.linearRampToValueAtTime(
+          targetVolume,
+          fadeInStartTime + halfDurationSec
+      );
     }
 
     // Wait for fade in to complete
     await new Promise<void>((resolve) => {
       const checkTime = () => {
-        if (this.audioContext && this.audioContext.currentTime >= fadeInStartTime + halfDurationSec) {
+        if (
+            this.audioContext &&
+            this.audioContext.currentTime >= fadeInStartTime + halfDurationSec
+        ) {
           resolve();
         } else {
           requestAnimationFrame(checkTime);
@@ -317,7 +375,10 @@ class AudioManager {
         }
         if (activeChannel.gainNode) {
           activeChannel.gainNode.gain.setValueAtTime(0, now);
-          activeChannel.gainNode.gain.linearRampToValueAtTime(track.volume, now + fadeDuration);
+          activeChannel.gainNode.gain.linearRampToValueAtTime(
+              track.volume,
+              now + fadeDuration
+          );
         }
       }
     }
