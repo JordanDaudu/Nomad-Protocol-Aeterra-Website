@@ -12,6 +12,9 @@ interface AudioChannel {
   audio: HTMLAudioElement;
   source: MediaElementAudioSourceNode | null;
   gainNode: GainNode | null;
+
+  // Track loaded in this channel (so we can resume + pause correctly)
+  trackId: string;
 }
 
 class AudioManager {
@@ -19,15 +22,21 @@ class AudioManager {
   private channelA: AudioChannel | null = null;
   private channelB: AudioChannel | null = null;
   private activeChannel: "A" | "B" = "A";
+
   private currentTrackId: string = "default";
   private isMuted: boolean = false;
+
   private autoplayBlocked: boolean = false;
   private isInitialized: boolean = false;
   private isUnlocked: boolean = false;
+
   private listeners: Set<(muted: boolean) => void> = new Set();
 
-  // Remember per-track playback position so each OST resumes
+  // resume positions per track
   private trackPositions: Record<string, number> = {};
+
+  // prevents old async transitions from “winning” after a newer route change
+  private transitionSeq: number = 0;
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -50,7 +59,7 @@ class AudioManager {
     return new AudioContextClass();
   }
 
-  private createChannel(track: AudioTrack): AudioChannel {
+  private createChannel(track: AudioTrack, trackId: string): AudioChannel {
     const audio = new Audio();
     audio.src = track.src;
     audio.loop = track.loop;
@@ -63,6 +72,7 @@ class AudioManager {
       audio,
       source: null,
       gainNode: null,
+      trackId,
     };
   }
 
@@ -89,6 +99,7 @@ class AudioManager {
         await this.audioContext.resume();
       }
 
+      // iOS/Safari unlock tick
       const oscillator = this.audioContext.createOscillator();
       const silentGain = this.audioContext.createGain();
       silentGain.gain.value = 0;
@@ -103,60 +114,147 @@ class AudioManager {
     }
   }
 
+  private getTrackById(trackId: string): AudioTrack {
+    return AUDIO_TRACKS[trackId] || AUDIO_TRACKS.default;
+  }
+
+  private savePosition(channel: AudioChannel | null): void {
+    if (!channel) return;
+    const t = channel.audio.currentTime;
+    if (Number.isFinite(t) && t >= 0) {
+      this.trackPositions[channel.trackId] = t;
+    }
+  }
+
+  private async waitUntilReady(audio: HTMLAudioElement): Promise<void> {
+    // canplaythrough is not guaranteed on mobile; loadedmetadata is safer
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        audio.removeEventListener("loadedmetadata", finish);
+        audio.removeEventListener("canplay", finish);
+        audio.removeEventListener("canplaythrough", finish);
+        resolve();
+      };
+
+      audio.addEventListener("loadedmetadata", finish);
+      audio.addEventListener("canplay", finish);
+      audio.addEventListener("canplaythrough", finish);
+
+      // fallback
+      setTimeout(finish, 1500);
+    });
+  }
+
+  private applySafeResumeTime(audio: HTMLAudioElement, resumeTime: number): void {
+    try {
+      const dur = audio.duration;
+      const desired = Math.max(resumeTime || 0, 0);
+
+      if (Number.isFinite(dur) && dur > 0) {
+        // clamp
+        let safe = Math.min(desired, Math.max(0, dur - 0.05));
+
+        // if we’re extremely close to end, just restart (prevents instant loop feeling)
+        if (dur - safe < 0.25) safe = 0;
+
+        audio.currentTime = safe;
+      } else {
+        audio.currentTime = desired;
+      }
+    } catch {
+      // ignore seek failures
+    }
+  }
+
+  private async ensureChannelHasTrack(
+      channel: AudioChannel,
+      track: AudioTrack,
+      trackId: string
+  ): Promise<void> {
+    const needsLoad = channel.trackId !== trackId || channel.audio.src !== track.src;
+
+    if (needsLoad) {
+      // save old track position before overwriting
+      this.savePosition(channel);
+
+      channel.trackId = trackId;
+      channel.audio.src = track.src;
+      channel.audio.loop = track.loop;
+      channel.audio.load();
+    } else {
+      channel.audio.loop = track.loop;
+    }
+
+    await this.waitUntilReady(channel.audio);
+
+    const resumeTime = this.trackPositions[trackId] ?? 0;
+    this.applySafeResumeTime(channel.audio, resumeTime);
+  }
+
+  private async playCurrentFromUserGesture(): Promise<void> {
+    if (!this.audioContext) return;
+
+    await this.unlockAudio();
+    if (this.isMuted) return;
+
+    const active = this.getActiveChannel();
+    if (!active) return;
+
+    const track = this.getTrackById(this.currentTrackId);
+
+    // Ensure the active channel actually holds the current track (fixes “enter non-main route”)
+    await this.ensureChannelHasTrack(active, track, this.currentTrackId);
+
+    try {
+      await active.audio.play();
+      this.autoplayBlocked = false;
+
+      if (active.gainNode) {
+        active.gainNode.gain.setValueAtTime(
+            track.volume,
+            this.audioContext.currentTime
+        );
+      }
+
+      this.notifyListeners();
+    } catch {
+      this.autoplayBlocked = true;
+      this.notifyListeners();
+    }
+  }
+
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     this.audioContext = this.createAudioContext();
 
     const defaultTrack = AUDIO_TRACKS.default;
-    this.channelA = this.createChannel(defaultTrack);
-    this.channelB = this.createChannel(defaultTrack);
+    this.channelA = this.createChannel(defaultTrack, "default");
+    this.channelB = this.createChannel(defaultTrack, "default");
 
     this.connectChannel(this.channelA);
     this.connectChannel(this.channelB);
 
     this.isInitialized = true;
 
+    // ✅ IMPORTANT FIX:
+    // First gesture should start the *current track*, not always channelA/default.
     const handleUserInteraction = async () => {
-      await this.unlockAudio();
-
-      if (!this.isMuted && this.channelA) {
-        try {
-          await this.channelA.audio.play();
-          if (this.channelA.gainNode && this.audioContext) {
-            const track = AUDIO_TRACKS.default;
-            this.channelA.gainNode.gain.setValueAtTime(
-                track.volume,
-                this.audioContext.currentTime
-            );
-          }
-        } catch (e) {
-          this.autoplayBlocked = true;
-          this.notifyListeners();
-        }
-      }
-
-      document.removeEventListener("click", handleUserInteraction);
-      document.removeEventListener("touchstart", handleUserInteraction);
+      await this.playCurrentFromUserGesture();
     };
 
-    document.addEventListener("click", handleUserInteraction, { once: true });
+    // pointerdown is more reliable on mobile than click alone
+    document.addEventListener("pointerdown", handleUserInteraction, { once: true });
     document.addEventListener("touchstart", handleUserInteraction, { once: true });
+    document.addEventListener("click", handleUserInteraction, { once: true });
 
+    // Desktop may succeed; mobile likely fails and sets autoplayBlocked.
     if (!this.isMuted) {
-      try {
-        await this.channelA.audio.play();
-        if (this.channelA.gainNode && this.audioContext) {
-          const track = AUDIO_TRACKS.default;
-          this.channelA.gainNode.gain.setValueAtTime(
-              track.volume,
-              this.audioContext.currentTime
-          );
-        }
-      } catch (e) {
-        this.autoplayBlocked = true;
-        this.notifyListeners();
-      }
+      await this.playCurrentFromUserGesture();
     }
   }
 
@@ -166,13 +264,12 @@ class AudioManager {
     }
 
     const trackId = getTrackIdForRoute(route);
-
-    if (trackId === this.currentTrackId) {
-      return;
-    }
+    if (trackId === this.currentTrackId) return;
 
     const track = getTrackForRoute(route);
-    await this.crossfadeTo(track, trackId);
+    const seq = ++this.transitionSeq;
+
+    await this.crossfadeTo(track, trackId, seq);
   }
 
   async setTrackById(trackId: string): Promise<void> {
@@ -180,9 +277,7 @@ class AudioManager {
       await this.initialize();
     }
 
-    if (trackId === this.currentTrackId) {
-      return;
-    }
+    if (trackId === this.currentTrackId) return;
 
     const track = AUDIO_TRACKS[trackId];
     if (!track) {
@@ -190,65 +285,53 @@ class AudioManager {
       return;
     }
 
-    await this.crossfadeTo(track, trackId);
+    const seq = ++this.transitionSeq;
+    await this.crossfadeTo(track, trackId, seq);
   }
 
-  private async crossfadeTo(track: AudioTrack, trackId: string): Promise<void> {
+  private async crossfadeTo(track: AudioTrack, trackId: string, seq: number): Promise<void> {
     const fadeOutChannel = this.getActiveChannel();
     const fadeInChannel = this.getInactiveChannel();
 
     if (!fadeOutChannel || !fadeInChannel || !this.audioContext) return;
 
-    const outgoingTrackId = this.currentTrackId; // track we are leaving
-    const targetVolume = this.isMuted ? 0 : track.volume;
+    const outgoingTrackId = this.currentTrackId;
     const halfDurationSec = FADE_DURATION / 2000;
 
-    // Prepare and preload the new track
-    fadeInChannel.audio.src = track.src;
-    fadeInChannel.audio.loop = track.loop;
+    // Prepare new track in fade-in channel and seek to resume time
+    if (fadeInChannel.gainNode) fadeInChannel.gainNode.gain.value = 0;
+    await this.ensureChannelHasTrack(fadeInChannel, track, trackId);
 
-    // Resume where we left off (default: 0)
-    const resumeTime = this.trackPositions[trackId] ?? 0;
+    // If a newer transition started, abandon this one
+    if (seq !== this.transitionSeq) return;
 
-    // Set initial gain to 0 for fade-in channel
-    if (fadeInChannel.gainNode) {
-      fadeInChannel.gainNode.gain.value = 0;
+    // If muted OR nothing is currently playing OR audio context likely still locked,
+    // do a “silent switch”: update state and wait for user gesture to start playback.
+    const noAudioCurrentlyPlaying = fadeOutChannel.audio.paused;
+    const contextLocked = this.audioContext.state === "suspended" && !this.isUnlocked;
+
+    if (this.isMuted || noAudioCurrentlyPlaying || contextLocked) {
+      // save outgoing position and stop outgoing audio
+      this.savePosition(fadeOutChannel);
+      fadeOutChannel.audio.pause();
+      fadeOutChannel.audio.currentTime = 0;
+
+      if (fadeOutChannel.gainNode) fadeOutChannel.gainNode.gain.value = 0;
+      if (fadeInChannel.gainNode) fadeInChannel.gainNode.gain.value = 0;
+
+      // swap active to the channel that holds the new track
+      this.activeChannel = this.activeChannel === "A" ? "B" : "A";
+      this.currentTrackId = trackId;
+
+      // On mobile this is the correct state: audio needs a gesture to start.
+      if (!this.isMuted) {
+        this.autoplayBlocked = true;
+      }
+      this.notifyListeners();
+      return;
     }
 
-    // Wait for the new track to be ready
-    await new Promise<void>((resolve) => {
-      let resolved = false;
-
-      const finish = () => {
-        if (resolved) return;
-        resolved = true;
-        fadeInChannel.audio.removeEventListener("canplaythrough", onCanPlay);
-        resolve();
-      };
-
-      const onCanPlay = () => finish();
-
-      fadeInChannel.audio.addEventListener("canplaythrough", onCanPlay);
-      fadeInChannel.audio.load();
-
-      // Fallback timeout in case canplaythrough doesn't fire
-      setTimeout(finish, 1500);
-    });
-
-    // Only after it has loaded enough, set currentTime (safe on most browsers)
-    try {
-      const dur = fadeInChannel.audio.duration;
-      const safeTime =
-          Number.isFinite(dur) && dur > 0
-              ? Math.min(Math.max(resumeTime, 0), Math.max(0, dur - 0.05))
-              : Math.max(resumeTime, 0);
-
-      fadeInChannel.audio.currentTime = safeTime;
-    } catch {
-      // If setting currentTime fails, it will just start from 0
-    }
-
-    // Phase 1: Fade out current track using Web Audio scheduling
+    // Phase 1: fade out current track
     const fadeOutStartTime = this.audioContext.currentTime;
 
     if (fadeOutChannel.gainNode) {
@@ -261,7 +344,6 @@ class AudioManager {
       );
     }
 
-    // Wait for fade out to complete using AudioContext time
     await new Promise<void>((resolve) => {
       const checkTime = () => {
         if (
@@ -276,32 +358,47 @@ class AudioManager {
       requestAnimationFrame(checkTime);
     });
 
-    // Save outgoing position right before stopping
-    try {
-      const t = fadeOutChannel.audio.currentTime;
-      if (Number.isFinite(t) && t >= 0) {
-        this.trackPositions[outgoingTrackId] = t;
-      }
-    } catch {
-      // ignore
-    }
+    // If a newer transition started, abandon this one
+    if (seq !== this.transitionSeq) return;
 
-    // Stop the old track
-    fadeOutChannel.audio.pause();
-    fadeOutChannel.audio.currentTime = 0;
-
-    // Phase 2: Start and fade in new track
+    // Phase 2: start new track (while old one is still playing at 0 gain)
     try {
       await fadeInChannel.audio.play();
+      this.autoplayBlocked = false;
     } catch (e) {
       console.error("Failed to play new track:", e);
-      this.activeChannel = this.activeChannel === "A" ? "B" : "A";
-      this.currentTrackId = trackId;
+
+      // ✅ IMPORTANT FIX:
+      // Do NOT swap state. Restore old volume so we don’t get stuck on “old audio/state mismatch”.
+      const outgoingTrack = this.getTrackById(outgoingTrackId);
+      const restoreVol = this.isMuted ? 0 : outgoingTrack.volume;
+
+      const now = this.audioContext.currentTime;
+      if (fadeOutChannel.gainNode) {
+        fadeOutChannel.gainNode.gain.cancelScheduledValues(now);
+        fadeOutChannel.gainNode.gain.setValueAtTime(fadeOutChannel.gainNode.gain.value, now);
+        fadeOutChannel.gainNode.gain.linearRampToValueAtTime(restoreVol, now + 0.2);
+      }
+
+      // Stop/reset the attempted new channel
+      try {
+        fadeInChannel.audio.pause();
+        fadeInChannel.audio.currentTime = 0;
+      } catch {}
+
+      this.autoplayBlocked = true;
+      this.notifyListeners();
       return;
     }
 
-    // Schedule fade in using Web Audio
+    // Save outgoing position and stop old track
+    this.trackPositions[outgoingTrackId] = fadeOutChannel.audio.currentTime || 0;
+    fadeOutChannel.audio.pause();
+    fadeOutChannel.audio.currentTime = 0;
+
+    // Fade in the new track
     const fadeInStartTime = this.audioContext.currentTime;
+    const targetVolume = this.isMuted ? 0 : track.volume;
 
     if (fadeInChannel.gainNode) {
       fadeInChannel.gainNode.gain.cancelScheduledValues(fadeInStartTime);
@@ -312,7 +409,6 @@ class AudioManager {
       );
     }
 
-    // Wait for fade in to complete
     await new Promise<void>((resolve) => {
       const checkTime = () => {
         if (
@@ -327,12 +423,17 @@ class AudioManager {
       requestAnimationFrame(checkTime);
     });
 
+    if (seq !== this.transitionSeq) return;
+
+    // Swap active channel + current track
     this.activeChannel = this.activeChannel === "A" ? "B" : "A";
     this.currentTrackId = trackId;
+
+    this.notifyListeners();
   }
 
   resetToDefault(): void {
-    this.setContext("/");
+    void this.setContext("/");
   }
 
   async toggleMute(): Promise<void> {
@@ -351,29 +452,47 @@ class AudioManager {
     const now = this.audioContext.currentTime;
     const fadeDuration = 0.3;
 
+    // Save positions before we potentially pause
+    this.savePosition(activeChannel);
+    this.savePosition(inactiveChannel);
+
     if (this.isMuted) {
-      if (activeChannel?.gainNode) {
-        const currentGain = activeChannel.gainNode.gain.value;
-        activeChannel.gainNode.gain.setValueAtTime(currentGain, now);
-        activeChannel.gainNode.gain.linearRampToValueAtTime(0, now + fadeDuration);
-      }
-      if (inactiveChannel?.gainNode) {
-        const currentGain = inactiveChannel.gainNode.gain.value;
-        inactiveChannel.gainNode.gain.setValueAtTime(currentGain, now);
-        inactiveChannel.gainNode.gain.linearRampToValueAtTime(0, now + fadeDuration);
-      }
+      // Fade both down then pause (prevents “old track keeps running” issues)
+      const fadeDown = (ch: AudioChannel | null) => {
+        if (!ch?.gainNode) return;
+        ch.gainNode.gain.cancelScheduledValues(now);
+        ch.gainNode.gain.setValueAtTime(ch.gainNode.gain.value, now);
+        ch.gainNode.gain.linearRampToValueAtTime(0, now + fadeDuration);
+      };
+
+      fadeDown(activeChannel);
+      fadeDown(inactiveChannel);
+
+      setTimeout(() => {
+        try {
+          activeChannel?.audio.pause();
+          inactiveChannel?.audio.pause();
+        } catch {}
+      }, fadeDuration * 1000 + 50);
     } else {
-      const track = AUDIO_TRACKS[this.currentTrackId] || AUDIO_TRACKS.default;
+      // Unmute: ensure we’re playing the CURRENT track (fixes “unmute still old audio”)
+      const track = this.getTrackById(this.currentTrackId);
 
       if (activeChannel) {
+        await this.ensureChannelHasTrack(activeChannel, track, this.currentTrackId);
+
         if (activeChannel.audio.paused) {
           try {
             await activeChannel.audio.play();
+            this.autoplayBlocked = false;
           } catch (e) {
             console.error("Failed to resume audio:", e);
+            this.autoplayBlocked = true;
           }
         }
+
         if (activeChannel.gainNode) {
+          activeChannel.gainNode.gain.cancelScheduledValues(now);
           activeChannel.gainNode.gain.setValueAtTime(0, now);
           activeChannel.gainNode.gain.linearRampToValueAtTime(
               track.volume,
@@ -405,23 +524,7 @@ class AudioManager {
       return;
     }
 
-    await this.unlockAudio();
-
-    const activeChannel = this.getActiveChannel();
-    if (activeChannel && activeChannel.audio.paused) {
-      try {
-        await activeChannel.audio.play();
-        if (activeChannel.gainNode && this.audioContext && !this.isMuted) {
-          const track = AUDIO_TRACKS[this.currentTrackId] || AUDIO_TRACKS.default;
-          const now = this.audioContext.currentTime;
-          activeChannel.gainNode.gain.setValueAtTime(track.volume, now);
-        }
-        this.autoplayBlocked = false;
-        this.notifyListeners();
-      } catch (e) {
-        console.error("Failed to autoplay:", e);
-      }
-    }
+    await this.playCurrentFromUserGesture();
   }
 
   isAutoplayBlocked(): boolean {
