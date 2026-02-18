@@ -8,8 +8,7 @@ import Layout from "@/components/layout";
 import Home from "@/pages/home";
 import Devlogs from "@/pages/devlogs";
 import DevlogPost from "@/pages/devlog-post";
-import Systems from "@/pages/systems";
-import SystemDetail from "@/pages/system-detail";
+import SystemsArchivePage from "@/pages/systems";
 import Lore from "@/pages/lore";
 import LoreDetail from "@/pages/lore-detail";
 import Gallery from "@/pages/gallery";
@@ -21,8 +20,8 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/devlogs" component={Devlogs} />
         <Route path="/devlogs/:id" component={DevlogPost} />
-        <Route path="/systems" component={Systems} />
-        <Route path="/systems/:id" component={SystemDetail} />
+        <Route path="/systems" component={SystemsArchivePage} />
+        <Route path="/systems/*" component={SystemsArchivePage} />
         <Route path="/lore" component={Lore} />
         <Route path="/lore/:id" component={LoreDetail} />
         <Route path="/gallery" component={Gallery} />

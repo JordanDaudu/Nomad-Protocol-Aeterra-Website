@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { getDevlogs, getDevlogById, getLore, getLoreById, getGallery, getSystems, getSystemById } from "./content";
+import { getDevlogs, getDevlogById, getLore, getLoreById, getGallery, getSystems, getSystemById, getSystemsTree } from "./content";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -75,6 +75,16 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching systems:", error);
       res.status(500).json({ error: "Failed to fetch systems" });
+    }
+  });
+
+  app.get("/api/systems/tree", (req, res) => {
+    try {
+      const tree = getSystemsTree();
+      res.json(tree);
+    } catch (error) {
+      console.error("Error fetching systems tree:", error);
+      res.status(500).json({ error: "Failed to fetch systems tree" });
     }
   });
 

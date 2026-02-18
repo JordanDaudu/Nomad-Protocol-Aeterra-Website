@@ -339,10 +339,87 @@ The visual theme is defined in `client/src/index.css`.
 2. Add entry to `content/gallery/gallery.json` (order = position in array)
 3. Done!
 
-### Add System Documentation
-1. Create `content/systems/X-system-name.md`
-2. Add frontmatter (title, summary, order, optional ost)
-3. Write flexible Markdown content (no fixed structure required)
+### Systems Archive - Full Usage Guide
+The Systems Archive is a browsable documentation hub for game system technical docs. It supports nested folders, automatic tree navigation, search, and per-page metadata.
+#### Folder Structure
+All systems content lives in `content/systems/`. Drop `.md` files here (or in any subfolder) and they appear automatically on the site — no code changes needed.
+```
+content/systems/
+├── 00_Systems_Index.md          ← Root index page (shown at /systems)
+├── Core/
+│   ├── 10_Object_Pooling.md
+│   └── 11_Input_Actions_Integration.md
+├── Player/
+│   ├── 20_Player_Root_Composition.md
+│   ├── 21_Player_Movement.md
+│   ├── 22_Player_Aim_and_Camera_Target.md
+│   └── 23_Camera_Manager.md
+├── Combat/
+│   ├── 30_Weapons_Data_ScriptableObjects.md
+│   ├── 31_Weapon_Runtime_Model.md
+│   ├── 32_Player_Weapon_Controller.md
+│   ├── 33_Weapon_Visuals_Rigging_AnimationEvents.md
+│   └── 34_Projectiles_Bullet_ImpactFX.md
+└── Interaction & Pickups/
+    ├── 40_Interaction_System.md
+    └── 41_Pickups_Weapons_and_Ammo.md
+```
+#### Adding a New System Doc
+1. Create a `.md` file in `content/systems/` or any subfolder.
+2. Add YAML frontmatter at the top of the file.
+3. The doc appears in the archive tree and is routable immediately (after server restart in production, or live in development).
+#### Frontmatter Reference
+Required fields:
+```yaml
+---
+title: "System Name"
+summary: "One-line description of what this system does"
+order: 10
+---
+```
+Optional fields:
+```yaml
+---
+title: "System Name"
+summary: "One-line description"
+order: 10
+status: "In Development"
+tags: ["Combat", "Weapons", "Data-Driven"]
+last_updated: "2026-02-18"
+ost: "/audio/custom-track.mp3"
+---
+```
+| Field          | Type       | Required | Description |
+|----------------|------------|----------|-------------|
+| `title`        | string     | Yes      | Display title in the tree and page header |
+| `summary`      | string     | Yes      | Short description shown in listings and search results |
+| `order`        | number     | Yes      | Controls sort position within its folder (lower = first) |
+| `status`       | string     | No       | Shown as a badge (e.g., "In Development", "Implemented") |
+| `tags`         | string[]   | No       | Shown as labels; also searchable |
+| `last_updated` | string     | No       | Date string shown in the doc header |
+| `ost`          | string     | No       | Path to an audio track that overrides the page BGM |
+#### Sorting Rules
+Docs and folders are sorted by these rules in order:
+1. Index files (`00_*_Index.md`) always appear first
+2. Folders appear before docs
+3. `order` frontmatter value (ascending)
+4. Numeric prefix in the filename (e.g., `10_`, `20_`)
+5. Alphabetical by title
+#### Creating Subfolders
+Create any directory inside `content/systems/`. Folder names are cleaned up for display:
+- Numeric prefixes are stripped: `10_Core` displays as "Core"
+- Underscores/hyphens become spaces: `Interaction_&_Pickups` displays as "Interaction & Pickups"
+  To give a folder a custom title and summary, add an index file named `00_<FolderName>_Index.md` inside it. The index file's `title` and `summary` frontmatter will be used for the folder's display name and description.
+#### Cross-Linking Between Docs
+Use relative Markdown links to link between system docs. These are automatically resolved to in-app navigation:
+```markdown
+See the [Player Core System](./20_Player_Root_Composition.md) for details.
+See the [Object Pooling](../Core/10_Object_Pooling.md) system.
+```
+#### Search
+The archive includes a search bar that matches against doc titles, summaries, and tags. Index files are excluded from search results.
+#### API Endpoint
+The backend exposes `GET /api/systems/tree` which returns the full tree structure with all content, parsed frontmatter, and folder hierarchy. The frontend fetches this once and caches it for 5 minutes via TanStack Query.
 
 ## 🎵 Audio System (Dynamic OST)
 
