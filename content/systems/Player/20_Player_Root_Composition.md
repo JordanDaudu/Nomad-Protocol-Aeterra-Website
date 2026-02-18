@@ -7,8 +7,6 @@ tags: ["Player", "Composition", "Core"]
 last_updated: "2026-02-18"
 ---
 
-# Player Root Composition
-
 ## 🧭 Overview
 `Player` is a lightweight “composition root” component that:
 - Creates and owns the `InputSystem_Actions` instance.

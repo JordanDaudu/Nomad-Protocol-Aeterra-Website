@@ -7,8 +7,6 @@ tags: ["Core", "Input", "Unity Input System"]
 last_updated: "2026-02-18"
 ---
 
-# Input Actions Integration
-
 ## 🧭 Overview
 The project uses Unity’s **New Input System** via a generated wrapper class named `InputSystem_Actions`. Custom scripts subscribe to action callbacks (`performed`, `canceled`) rather than polling input every frame.
 

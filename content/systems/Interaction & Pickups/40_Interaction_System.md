@@ -7,8 +7,6 @@ tags: ["Interaction", "Gameplay", "UI Feedback"]
 last_updated: "2026-02-18"
 ---
 
-# Interaction System
-
 ## 🧭 Overview
 The interaction framework is built around:
 - `Interactable` base class (trigger registration + highlight + virtual `Interaction()`).

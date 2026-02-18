@@ -7,8 +7,6 @@ tags: ["Combat", "Weapons", "Runtime State"]
 last_updated: "2026-02-18"
 ---
 
-# Weapon Runtime Model
-
 ## 🧭 Overview
 `Weapon` is a pure C# runtime model (not a MonoBehaviour). It represents one weapon instance in the player’s inventory and owns:
 - Current ammo counts

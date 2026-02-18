@@ -7,8 +7,6 @@ tags: ["Combat", "Animation", "Rigging", "Visuals"]
 last_updated: "2026-02-18"
 ---
 
-# Weapon Visuals, Rigging & Animation Events
-
 ## 🧭 Overview
 Weapon visuals are separated from weapon gameplay logic:
 - `PlayerWeaponController` decides what happens.

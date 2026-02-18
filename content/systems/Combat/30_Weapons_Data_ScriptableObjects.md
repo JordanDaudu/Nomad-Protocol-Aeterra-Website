@@ -7,8 +7,6 @@ tags: ["Combat", "Weapons", "Data-Driven", "ScriptableObjects"]
 last_updated: "2026-02-18"
 ---
 
-# Weapons Data (ScriptableObjects)
-
 ## 🧭 Overview
 Weapons are configured using a `WeaponData : ScriptableObject` asset. These assets define **static defaults** and tuning values. Runtime state is stored in the `Weapon` class (see Weapon Runtime Model doc).
 

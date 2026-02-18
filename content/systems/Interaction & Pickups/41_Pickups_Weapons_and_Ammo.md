@@ -7,8 +7,6 @@ tags: ["Interaction", "Pickups", "Combat"]
 last_updated: "2026-02-18"
 ---
 
-# Pickups: Weapons & Ammo
-
 ## 🧭 Overview
 Pickups are implemented as interactables:
 - `PickupWeapon : Interactable`

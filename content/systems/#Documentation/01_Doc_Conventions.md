@@ -7,8 +7,6 @@ tags: ["Systems", "Docs", "Conventions"]
 last_updated: "2026-02-18"
 ---
 
-# Systems Doc Conventions
-
 ## 🧭 Overview
 Every system doc follows the same template so you can scan quickly and avoid “where was that implemented?” moments.
 

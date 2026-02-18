@@ -7,8 +7,6 @@ tags: ["Player", "Camera", "Cinemachine"]
 last_updated: "2026-02-18"
 ---
 
-# Camera Manager (Cinemachine Distance)
-
 ## 🧭 Overview
 `CameraManager` is a `DontDestroyOnLoad` singleton that manages **Cinemachine camera distance** using `CinemachinePositionComposer.CameraDistance`. It exposes a single method `ChangeCameraDistance(float)` which other systems call.
 

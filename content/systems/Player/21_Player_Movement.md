@@ -7,8 +7,6 @@ tags: ["Player", "Movement", "Input"]
 last_updated: "2026-02-18"
 ---
 
-# Player Movement
-
 ## 🧭 Overview
 Movement is implemented with Unity’s `CharacterController` and driven by input actions:
 - `Move` (Vector2)

@@ -7,8 +7,6 @@ tags: ["Combat", "Projectiles", "Pooling", "VFX"]
 last_updated: "2026-02-18"
 ---
 
-# Projectiles: Bullet & Impact FX
-
 ## 🧭 Overview
 Bullets are pooled GameObjects controlled by the `Bullet` script. The projectile is spawned and launched by `PlayerWeaponController`, and the bullet:
 - Tracks its start position and max fly distance

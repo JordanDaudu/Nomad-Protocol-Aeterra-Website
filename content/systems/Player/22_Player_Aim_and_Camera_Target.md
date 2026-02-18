@@ -7,8 +7,6 @@ tags: ["Player", "Aim", "Camera", "Combat"]
 last_updated: "2026-02-18"
 ---
 
-# Player Aim & Camera Target
-
 ## 🧭 Overview
 `PlayerAim` controls:
 - Converting mouse screen position into a world hit point (`GetMouseHitInfo()`).

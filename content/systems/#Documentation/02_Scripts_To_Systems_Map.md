@@ -7,8 +7,6 @@ tags: ["Systems", "Docs", "Mapping"]
 last_updated: "2026-02-18"
 ---
 
-# Scripts → Systems Map
-
 Primary ownership mapping (one script → one “home” system doc).
 
 | System Doc | Script/Class | File Path |

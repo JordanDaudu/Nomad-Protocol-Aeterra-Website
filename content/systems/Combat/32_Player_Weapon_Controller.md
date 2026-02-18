@@ -7,8 +7,6 @@ tags: ["Combat", "Weapons", "Player"]
 last_updated: "2026-02-18"
 ---
 
-# Player Weapon Controller
-
 ## 🧭 Overview
 `PlayerWeaponController` orchestrates the weapon gameplay loop:
 - Weapon inventory (slots)

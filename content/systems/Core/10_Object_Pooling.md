@@ -7,8 +7,6 @@ tags: ["Core", "Performance", "Pooling"]
 last_updated: "2026-02-18"
 ---
 
-# Object Pooling
-
 ## 🧭 Overview
 A global pooling service implemented as a `DontDestroyOnLoad` singleton. It manages pooled instances per prefab (`prefab → queue`) and is used by:
 - `Bullet` (projectiles)
