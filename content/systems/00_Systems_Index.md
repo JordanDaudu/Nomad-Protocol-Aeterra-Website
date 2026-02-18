@@ -7,8 +7,6 @@ tags: ["Systems", "Documentation"]
 last_updated: "2026-02-18"
 ---
 
-# Systems
-
 This section documents **the systems that actually exist in the codebase** as of **2026-02-18**.
 
 ## 🗂 Index
