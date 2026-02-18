@@ -353,7 +353,10 @@ export default function SystemsArchivePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const currentRoute = location === "/systems" || location === "/systems/"
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [drawerTop, setDrawerTop] = useState(0);
+
+    const currentRoute = location === "/systems" || location === "/systems/"
     ? "/systems"
     : location.replace(/\/$/, "");
 
@@ -409,7 +412,38 @@ export default function SystemsArchivePage() {
     }
   }, [searchQuery, allDocs]);
 
-  if (isLoading) {
+    useEffect(() => {
+        const update = () => {
+            const el = headerRef.current;
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            setDrawerTop(Math.round(rect.bottom));
+        };
+
+        update();
+        window.addEventListener("resize", update);
+        window.addEventListener("scroll", update, { passive: true });
+
+        return () => {
+            window.removeEventListener("resize", update);
+            window.removeEventListener("scroll", update);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!sidebarOpen) return;
+
+        const el = headerRef.current;
+        if (!el) return;
+
+        // Run after React commits + the drawer toggle causes layout changes
+        requestAnimationFrame(() => {
+            const rect = el.getBoundingClientRect();
+            setDrawerTop(Math.round(rect.bottom));
+        });
+    }, [sidebarOpen]);
+
+    if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-6 h-6 text-primary animate-spin" />
@@ -519,7 +553,10 @@ export default function SystemsArchivePage() {
 
   return (
     <div className="systems-archive -m-6 md:-m-12 flex flex-col" style={{ height: "calc(100vh - 3.5rem)" }}>
-      <div className="border-b border-border bg-card/30 backdrop-blur-sm px-4 py-2 flex items-center justify-between gap-4 shrink-0">
+        <div
+            ref={headerRef}
+            className="h-12 border-b border-border bg-card/30 backdrop-blur-sm px-4 flex items-center justify-between gap-4 shrink-0"
+        >
         <div className="flex items-center gap-3 min-w-0">
           <button
             className="md:hidden font-terminal text-xs text-muted-foreground border border-border px-2 py-1 hover:text-primary hover:border-primary/50 transition-colors"
@@ -557,46 +594,85 @@ export default function SystemsArchivePage() {
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside
-          className={`systems-tree-sidebar border-r border-border bg-card/20 backdrop-blur-sm overflow-y-auto shrink-0 transition-all duration-300 ${
-            sidebarOpen ? "w-64 absolute z-30 h-full md:relative" : "w-0 md:w-56 overflow-hidden md:overflow-y-auto"
-          }`}
-        >
-          <div className="py-2">
-            <div className="px-3 py-2 mb-1">
-              <span className="font-terminal text-[10px] text-muted-foreground uppercase tracking-widest">
-                Archive Tree
-              </span>
-            </div>
-            <button
-              onClick={() => handleNavigate("/systems")}
-              className={`tree-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm font-terminal transition-all duration-200 ${
-                currentRoute === "/systems"
-                  ? "text-primary bg-primary/10 border-l-2 border-primary tree-item-active"
-                  : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-l-2 border-transparent"
-              }`}
-              data-testid="tree-root"
-            >
-              <FolderOpen className="w-3.5 h-3.5 shrink-0 text-secondary opacity-70" />
-              <span className="truncate">Systems Index</span>
-            </button>
-            {getVisibleChildren(tree).map((child) => (
-              <TreeNode
-                key={child.route}
-                node={child}
-                currentRoute={currentRoute}
-                onNavigate={handleNavigate}
-                depth={1}
-              />
-            ))}
-          </div>
-        </aside>
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+            <AnimatePresence>
+                {sidebarOpen && (
+                    <motion.button
+                        aria-label="Close sidebar"
+                        onClick={() => setSidebarOpen(false)}
+                        className="fixed left-0 right-0 bottom-0 z-30 bg-black/50 md:hidden"
+                        style={{ top: drawerTop }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                    />
+                )}
+            </AnimatePresence>
 
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 min-w-0">
-          <div className="max-w-3xl mx-auto">{renderContent()}</div>
-        </main>
-      </div>
+            <aside
+                className={[
+                    "systems-tree-sidebar border-r border-border bg-card/20 backdrop-blur-sm overflow-y-auto",
+                    "md:relative md:translate-x-0 md:w-56 md:shrink-0 md:z-auto",
+                    "fixed md:static z-40 left-0 w-64 bottom-0",
+                    "transition-transform duration-300 ease-out will-change-transform",
+                    sidebarOpen ? "translate-x-0" : "-translate-x-full",
+                ].join(" ")}
+                style={{ top: drawerTop }}
+            >
+
+            {/* Mobile drawer header */}
+                <div className="md:hidden sticky top-0 z-10 border-b border-border bg-card/60 backdrop-blur-sm px-3 py-2 flex items-center justify-between">
+      <span className="font-terminal text-[10px] text-muted-foreground uppercase tracking-widest">
+        Archive Tree
+      </span>
+                    <button
+                        onClick={() => setSidebarOpen(false)}
+                        className="font-terminal text-xs text-muted-foreground border border-border px-2 py-1 hover:text-primary hover:border-primary/50 transition-colors"
+                        aria-label="Close tree"
+                        data-testid="sidebar-close"
+                    >
+                        CLOSE
+                    </button>
+                </div>
+
+                {/* Tree content */}
+                <div className="py-2">
+                    <div className="hidden md:block px-3 py-2 mb-1">
+                        <span className="font-terminal text-[10px] text-muted-foreground uppercase tracking-widest">
+                            Archive Tree
+                        </span>
+                    </div>
+
+                    <button
+                        onClick={() => handleNavigate("/systems")}
+                        className={`tree-item w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm font-terminal transition-all duration-200 ${
+                            currentRoute === "/systems"
+                                ? "text-primary bg-primary/10 border-l-2 border-primary tree-item-active"
+                                : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-l-2 border-transparent"
+                        }`}
+                        data-testid="tree-root"
+                    >
+                        <FolderOpen className="w-3.5 h-3.5 shrink-0 text-secondary opacity-70" />
+                        <span className="truncate">Systems Index</span>
+                    </button>
+
+                    {getVisibleChildren(tree).map((child) => (
+                        <TreeNode
+                            key={child.route}
+                            node={child}
+                            currentRoute={currentRoute}
+                            onNavigate={handleNavigate}
+                            depth={1}
+                        />
+                    ))}
+                </div>
+            </aside>
+
+            <main className="flex-1 overflow-y-auto p-6 md:p-8 min-w-0">
+                <div className="max-w-3xl mx-auto">{renderContent()}</div>
+            </main>
+        </div>
     </div>
   );
 }
