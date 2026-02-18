@@ -53,7 +53,7 @@ WeaponData now contains the full weapon identity:
 - Gun distance and camera distance tuning per weapon
 
 This allows balancing and iteration directly in the Inspector without changing code.
-![ScriptableObject Example](/devlog-assets/07_2.png)
+![ScriptableObject Example](/devlog-assets/07_2.jpg)
 
 ---
 
