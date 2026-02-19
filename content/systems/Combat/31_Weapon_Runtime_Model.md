@@ -4,7 +4,7 @@ summary: "The Weapon class stores runtime weapon state and implements firing/rel
 order: 31
 status: "In Development"
 tags: ["Combat", "Weapons", "Runtime State"]
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 ---
 
 ## 🧭 Overview
@@ -31,15 +31,15 @@ Trade-off: `Weapon` currently mixes multiple concerns (spread + burst + ammo) in
 **Does**
 - Initialize from `WeaponData` via constructor.
 - Implement spread:
-  - `ApplySpread(Vector3)`
+    - `ApplySpread(Vector3)`
 - Implement burst mode:
-  - `IsBurstModeActive()`
-  - `ToggleBurstMode()`
+    - `IsBurstModeActive()`
+    - `ToggleBurstMode()`
 - Implement shooting checks:
-  - `CanShoot()` (ammo + fire-rate gate)
+    - `CanShoot()` (ammo + fire-rate gate)
 - Implement reload logic:
-  - `CanReload()`
-  - `RefillBullets()`
+    - `CanReload()`
+    - `RefillBullets()`
 
 **Does NOT**
 - Spawn bullets or play animations.
@@ -52,18 +52,24 @@ Classes / Enums
 - `ShootType` enum
 
 Data relationship
-- Holds reference to the source `weaponData` (for pickup drop reconstruction).
+- Holds reference to the source `weaponData` (for identification + visuals).
+    - Runtime ammo/state is stored on the `Weapon` instance itself (not on the ScriptableObject).
 
 ## 🔄 Execution Flow
 1. Created via `new Weapon(weaponData)`
 2. Firing cycle:
-   - Controller calls `CanShoot()`
-   - If true → controller decrements `bulletsInMagazine` and spawns bullet
+    - Controller calls `CanShoot()`
+    - If true → controller decrements `bulletsInMagazine` and spawns bullet
 3. Spread:
-   - Controller calls `ApplySpread(direction)` when firing
+    - Controller calls `ApplySpread(direction)` when firing
 4. Reload:
-   - Controller checks `CanReload()`, plays reload animation
-   - Animation event calls `RefillBullets()`
+    - Controller checks `CanReload()`, plays reload animation
+    - Animation event calls `RefillBullets()`
+
+## ♻ Drop & Re-Pickup Persistence
+- When a weapon is **dropped**, `PlayerWeaponController` spawns a pooled `PickupWeapon` and injects the **existing runtime** `Weapon` instance (ammo/state preserved).
+- When the player picks it up again **and does not already own that weapon type**, the same runtime instance is re-added to the inventory, so `bulletsInMagazine` and `totalReservedAmmo` persist.
+- If the player **already owns** that weapon type, the controller treats the pickup as **ammo-only** (transfers `bulletsInMagazine` and consumes the pickup).
 
 ## 🔗 Dependencies
 **Depends On**

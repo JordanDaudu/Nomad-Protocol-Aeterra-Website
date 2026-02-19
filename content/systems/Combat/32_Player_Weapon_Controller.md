@@ -4,7 +4,7 @@ summary: "Owns weapon inventory, equips weapons, drives shooting and reloading, 
 order: 32
 status: "In Development"
 tags: ["Combat", "Weapons", "Player"]
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 ---
 
 ## 🧭 Overview
@@ -24,8 +24,8 @@ Provide one place that translates player input into weapon gameplay outcomes whi
 
 ## 🧠 Design Philosophy
 - Treat `weaponReady` as a simple combat gate:
-  - false during equip/reload/burst
-  - true when animation events confirm completion
+    - false during equip/reload/burst
+    - true when animation events confirm completion
 - Use input `performed/canceled` to support auto firing without per-frame input polling.
 - Keep pickup/drop logic rule-based to avoid “if spaghetti”.
 
@@ -37,9 +37,9 @@ Trade-off: controller currently owns multiple concerns (inventory + firing + pic
 - Equip weapon by slot index and trigger equip animation.
 - Set camera distance via `CameraManager`.
 - Handle pickup rules:
-  1) If weapon already owned → transfer bullets to reserve
-  2) If inventory full and different type → replace current weapon and drop old as pickup
-  3) Else → add weapon and enable backup visuals
+    1) If weapon already owned → treat pickup as **ammo-only** (transfer `bulletsInMagazine` into `totalReservedAmmo`)
+    2) If inventory full and different type → replace current weapon and drop old as pickup
+    3) Else → add weapon and enable backup visuals
 - Drop current weapon as a pooled pickup object.
 - Fire bullets using pooling and per-weapon spread.
 - Trigger reload animation and rely on animation event to refill ammo.
@@ -63,33 +63,38 @@ Unity references
 
 ## 🔄 Execution Flow
 1. `Start()`
-   - Cache `Player`
-   - Subscribe to input events
-   - `Invoke(EquipStartingWeapon, 0.1f)` (delayed initialization)
+    - Cache `Player`
+    - Subscribe to input events
+    - `Invoke(EquipStartingWeapon, 0.1f)` (delayed initialization)
 2. `Update()`
-   - If `isShooting` → call `Shoot()`
+    - If `isShooting` → call `Shoot()`
 3. Equip flow:
-   - `EquipWeapon(slotIndex)`
-     - `weaponReady = false`
-     - Set `currentWeapon`
-     - `player.weaponVisuals.PlayWeaponEquipAnimation()`
-     - `CameraManager.ChangeCameraDistance(currentWeapon.cameraDistance)`
-   - Animation event `WeaponEquipingIsOver()` sets `weaponReady = true`
+    - `EquipWeapon(slotIndex)`
+        - `weaponReady = false`
+        - Set `currentWeapon`
+        - `player.weaponVisuals.PlayWeaponEquipAnimation()`
+        - `CameraManager.ChangeCameraDistance(currentWeapon.cameraDistance)`
+    - Animation event `WeaponEquipingIsOver()` sets `weaponReady = true`
 4. Shooting flow:
-   - If not ready → return
-   - If `currentWeapon.CanShoot()` false → return
-   - Trigger fire animation
-   - If semi-auto → reset `isShooting = false`
-   - If burst active → coroutine fires bullets with delay, then sets ready true
-   - Else fire single bullet
+    - If not ready → return
+    - If `currentWeapon.CanShoot()` false → return
+    - Trigger fire animation
+    - If semi-auto → reset `isShooting = false`
+    - If burst active → coroutine fires bullets with delay, then sets ready true
+    - Else fire single bullet
 5. Reload flow:
-   - Input triggers `Reload()` only if `currentWeapon.CanReload()` and `weaponReady`
-   - `Reload()` sets ready false and triggers reload animation
-   - Animation event `ReloadIsOver()` calls `RefillBullets()` and sets ready true
-6. Drop flow:
-   - If only one weapon → ignore
-   - Spawn pooled `weaponPickupPrefab` and `SetupPickupWeapon(currentWeapon, playerTransform)`
-   - Remove current weapon and equip slot 0
+    - Input triggers `Reload()` only if `currentWeapon.CanReload()` and `weaponReady`
+    - `Reload()` sets ready false and triggers reload animation
+    - Animation event `ReloadIsOver()` calls `RefillBullets()` and sets ready true
+6. Pickup flow:
+    - `PickupWeapon.Interaction()` calls `weaponController.PickupWeapon(weapon)`
+    - If the player already owns that weapon type → treat the pickup as **ammo-only** (transfer mag bullets into reserved ammo)
+    - Otherwise → add the weapon to a slot (dropped weapons keep their runtime ammo/state)
+7. Drop flow:
+    - If only one weapon → ignore
+    - Spawn pooled `weaponPickupPrefab` and `SetupPickupWeapon(currentWeapon, playerTransform)`
+        - The pickup keeps the **same runtime `Weapon` instance**, so ammo/state persists when re-picked up.
+    - Remove current weapon and equip slot 0
 
 ## 🔗 Dependencies
 **Depends On**

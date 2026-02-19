@@ -4,7 +4,7 @@ summary: "WeaponData assets define static tuning and defaults for each weapon ty
 order: 30
 status: "In Development"
 tags: ["Combat", "Weapons", "Data-Driven", "ScriptableObjects"]
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 ---
 
 ## 🧭 Overview
@@ -57,11 +57,14 @@ Data
 **Used By**
 - `Weapon` constructor reads from `WeaponData`.
 - `PlayerWeaponController` spawns a starting weapon from `defaultWeaponData`.
-- `PickupWeapon` uses `weaponData` to create pickup weapons.
+- `PickupWeapon` uses `weaponData` to create **fresh** runtime weapons for world-placed pickups.
+  - Dropped weapons are injected with an **existing runtime** `Weapon` instance so ammo/state is preserved.
 
 ## ⚠ Constraints & Assumptions
 - Ammo fields exist in `WeaponData` even though they are runtime-like; they serve as defaults for the runtime instance.
 - Ranges are used for Inspector tuning (reload/equip/gun/camera distance).
+
+> Important: `WeaponData` is intentionally *stateless* at runtime. Persistence (e.g., ammo after a drop) comes from carrying the **runtime `Weapon` instance**, not from the ScriptableObject.
 
 ## 📈 Scalability & Extensibility
 - Add new tuning fields here only when they are truly “static config”.
