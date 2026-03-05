@@ -1,84 +1,93 @@
 ---
 title: "Projectiles: Bullet & Impact FX"
-summary: "Pooled bullet behavior: travel distance, trail fade-out, collision impact VFX, and pool return."
+summary: "Pooled bullet behavior: travel distance, trail fade-out, collision impact VFX, enemy/shield hit routing, and pool return."
 order: 34
 status: "In Development"
-tags: ["Combat", "Projectiles", "Pooling", "VFX"]
-last_updated: "2026-02-18"
+tags: ["Combat", "Projectiles", "Pooling", "VFX", "Enemy"]
+last_updated: "2026-03-05"
 ---
 
 ## 🧭 Overview
-Bullets are pooled GameObjects controlled by the `Bullet` script. The projectile is spawned and launched by `PlayerWeaponController`, and the bullet:
+Bullets are pooled GameObjects controlled by `Bullet`. They are spawned and launched by `PlayerWeaponController`.
+
+At runtime a bullet:
 - Tracks its start position and max fly distance
-- Disables collider/mesh after traveling far enough (but keeps trail fading)
-- Spawns an impact VFX object on collision (also pooled)
+- Disables collider/mesh after traveling far enough (trail continues fading)
+- Spawns pooled impact VFX on collision
+- Routes hit logic (shield-first, then enemy)
 - Returns itself to the pool
 
 ## 🎯 Purpose
-Provide consistent, performant projectile behavior with good visual feedback:
-- Trails make bullet direction readable.
-- Impact VFX confirms hits.
-- Pooling keeps high fire rate viable.
+Provide consistent, performant projectile behavior with readable feedback:
+- Trails make shot direction readable
+- Impact VFX confirms contact
+- Pooling keeps high fire rate viable
 
 ## 🧠 Design Philosophy
-- Separate projectile behavior (`Bullet`) from firing orchestration (`PlayerWeaponController`).
-- Use a simple “distance-based lifetime” rather than time-based destroy.
-- Fade the trail before returning for smoother visuals.
-
-Trade-off: uses “magic numbers” for natural-looking fade timing; documented below.
+- Keep projectile lifecycle inside `Bullet`.
+- Keep firing orchestration inside `PlayerWeaponController`.
+- Use a distance-based lifetime (no destroy).
+- Route enemy interactions in the bullet collision handler to keep hit feedback deterministic.
 
 ## 📦 Core Responsibilities
 **Does**
-- Reset bullet state on spawn via `BulletSetup(flyDistance)`.
+- Reset bullet state on spawn via `BulletSetup(flyDistance, impactForce)`.
 - Disable collision and mesh once past max distance.
 - Fade trail near the end of travel.
 - Spawn pooled impact FX on `OnCollisionEnter`.
-- Return bullet + impact fx to pool.
+- Hit routing:
+  1) If the hit collider has `EnemyShield` → reduce durability and stop.
+  2) Else, find `Enemy` via `GetComponentInParent<Enemy>()` → `GetHit()` + `DeathImpact()`.
+- Return bullet + impact FX to pool.
 
 **Does NOT**
-- Apply damage (not implemented yet).
-- Perform hit scanning; it uses physics collisions.
+- Implement damage values (health decrement is currently in `Enemy.GetHit()`).
+- Perform hitscan; it uses physics collisions.
 
 ## 🧱 Key Components
 Classes
-- `Bullet` (`Scripts/Bullet.cs`)
+- `Bullet` (`code/Bullet.cs`)
 
 Unity components (required)
 - `Rigidbody`
 - `BoxCollider`
 - `MeshRenderer`
 - `TrailRenderer`
-- Impact FX prefab reference (`bulletImpactFX`)
+
+Prefab refs
+- Impact FX prefab (`bulletImpactFX`) (also pooled)
 
 ## 🔄 Execution Flow
-1. `PlayerWeaponController` spawns a pooled bullet and calls `BulletSetup(currentWeapon.gunDistance)`.
-2. Bullet `Update()`:
-   - `FadeTrailIfNeeded()`: when near end distance, trail time decreases rapidly.
-   - `DisableBulletIfNeeded()`: once beyond flyDistance, collider/mesh disabled.
-   - `ReturnToPoolIfNeeded()`: when `trailRenderer.time < 0`, return to pool.
-3. On collision:
-   - `CreateImpactFx(collision)` spawns pooled impact effect at contact point.
-   - Bullet returns to pool immediately.
+1. Spawn
+   - `PlayerWeaponController` spawns a pooled bullet and calls `BulletSetup(currentWeapon.gunDistance, impactForce)`.
+2. Flight (`Update()`)
+   - `FadeTrailIfNeeded()` reduces `TrailRenderer.time` near end-of-life.
+   - `DisableBulletIfNeeded()` disables collider/mesh after exceeding fly distance.
+   - `ReturnToPoolIfNeeded()` returns bullet when the trail fully fades.
+3. Collision (`OnCollisionEnter`)
+   - Spawn pooled impact FX at contact point.
+   - Return bullet to pool (pool return is slightly delayed so collision logic can still run).
+   - Shield-first routing:
+     - If `EnemyShield` on hit object → `ReduceDurability()` and return.
+     - Else if `Enemy` in parent → `GetHit()` and `DeathImpact(force, hitPoint, attachedRigidbody)`.
 
 ## 🔗 Dependencies
 **Depends On**
-- `ObjectPool` for bullet and impact FX pooling.
-- Physics collisions (`OnCollisionEnter`).
+- `ObjectPool` for bullet and impact FX pooling
+- Physics collisions (`OnCollisionEnter`)
+- Enemy systems (`Enemy`, `EnemyShield`) for hit routing
 
 **Used By**
-- `PlayerWeaponController` (spawns and launches bullets).
+- `PlayerWeaponController`
 
 ## ⚠ Constraints & Assumptions
-- `BulletSetup()` sets `flyDistance = weaponDistance + 0.5f`:
-  - `0.5f` is intentionally used to match the laser’s “tip” segment (see `PlayerAim.UpdateAimVisuals()`).
-- Trail fade uses magic constants:
-  - starts fading at `flyDistance - 1.5f`
-  - fade speed `8f * deltaTime`
-- Bullet return is based on trail time reaching below 0.
+- `BulletSetup()` adds a small distance buffer (`+ 0.5f`) to match the aim laser “tip” segment.
+- Trail fade uses tuned constants for visuals (start fading at `flyDistance - 1.5f`, fade speed multiplier `8f`).
+- `DeathImpact()` assumes the collided ragdoll bone collider has an `attachedRigidbody`.
 
 ## 📈 Scalability & Extensibility
-- Add surface-based impact variations by checking collision material/tag (not implemented yet).
-- Add ricochet or penetration by changing collision handling.
+- Add surface-based impact variations (tag/material based) by branching in `CreateImpactFx()`.
+- Add penetration/ricochet by changing collision behavior before returning to pool.
 
 ## ✅ Development Status
 In Development
@@ -88,3 +97,4 @@ Related devlogs:
 - Devlog 04 – Shooting foundations
 - Devlog 05 – Collision reliability + impact VFX
 - Devlog 06/07 – Pooling evolution
+- Devlog 09 – Bullet → enemy/shield integration and death impact

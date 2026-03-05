@@ -4,15 +4,15 @@ summary: "Architecture documentation for the implemented Unity gameplay systems.
 order: 0
 status: "In Development"
 tags: ["Systems", "Documentation"]
-last_updated: "2026-02-19"
+last_updated: "2026-03-05"
 ---
 
-This section documents **the systems that actually exist in the codebase** as of **2026-02-19**.
+This section documents **the systems that actually exist in the codebase** as of **2026-03-05**.
 
 ## 🗂 Index
 ## 🔎 Documentation
-- [Doc Conventions](#Documentation/01_Doc_Conventions.md)
-- [Scripts → Systems Map](#Documentation/02_Scripts_To_Systems_Map.md)
+- [Doc Conventions](./01_Doc_Conventions.md)
+- [Scripts → Systems Map](./02_Scripts_To_Systems_Map.md)
 
 ### Combat
 - [Weapons Data (ScriptableObjects)](./Combat/30_Weapons_Data_ScriptableObjects.md)
@@ -26,8 +26,8 @@ This section documents **the systems that actually exist in the codebase** as of
 - [Input Actions Integration](./Core/11_Input_Actions_Integration.md)
 
 ### Interaction & Pickups
-- [Interaction System](./Interaction/40_Interaction_System.md)
-- [Pickups: Weapons & Ammo](./Interaction/41_Pickups_Weapons_and_Ammo.md)
+- [Interaction System](./Interaction & Pickups/40_Interaction_System.md)
+- [Pickups: Weapons & Ammo](./Interaction & Pickups/41_Pickups_Weapons_and_Ammo.md)
 
 ### Player
 - [Player Root Composition](./Player/20_Player_Root_Composition.md)
@@ -35,5 +35,14 @@ This section documents **the systems that actually exist in the codebase** as of
 - [Player Aim & Camera Target](./Player/22_Player_Aim_and_Camera_Target.md)
 - [Camera Manager (Cinemachine Distance)](./Player/23_Camera_Manager.md)
 
+### Enemy
+- [Enemy Core Composition](./Enemy/50_Enemy_Core_Composition.md)
+- [Enemy State Machine](./Enemy/51_Enemy_State_Machine.md)
+- [Enemy Melee AI](./Enemy/52_Enemy_Melee_AI.md)
+- [Enemy Ranged AI](./Enemy/53_Enemy_Ranged_AI.md)
+- [Enemy Visuals & Variant Pipeline](./Enemy/54_Enemy_Visuals_and_Variants.md)
+- [Enemy Death Pipeline](./Enemy/55_Enemy_Death_Pipeline.md)
+- [Enemy Shield & Reactions](./Enemy/56_Enemy_Shield_and_Reactions.md)
+
 ## ✅ Scope Rule
-These docs intentionally avoid describing future features (enemy AI, damage, missions, etc.) unless explicitly marked as **future extension points**.
+These docs describe **implemented systems only**. Future features (new enemy archetypes, missions, etc.) are referenced only as *extension points*.

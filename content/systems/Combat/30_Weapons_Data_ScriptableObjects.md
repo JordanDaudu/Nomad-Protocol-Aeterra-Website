@@ -57,14 +57,11 @@ Data
 **Used By**
 - `Weapon` constructor reads from `WeaponData`.
 - `PlayerWeaponController` spawns a starting weapon from `defaultWeaponData`.
-- `PickupWeapon` uses `weaponData` to create **fresh** runtime weapons for world-placed pickups.
-  - Dropped weapons are injected with an **existing runtime** `Weapon` instance so ammo/state is preserved.
+- `PickupWeapon` uses `weaponData` to create pickup weapons.
 
 ## ⚠ Constraints & Assumptions
 - Ammo fields exist in `WeaponData` even though they are runtime-like; they serve as defaults for the runtime instance.
 - Ranges are used for Inspector tuning (reload/equip/gun/camera distance).
-
-> Important: `WeaponData` is intentionally *stateless* at runtime. Persistence (e.g., ammo after a drop) comes from carrying the **runtime `Weapon` instance**, not from the ScriptableObject.
 
 ## 📈 Scalability & Extensibility
 - Add new tuning fields here only when they are truly “static config”.
