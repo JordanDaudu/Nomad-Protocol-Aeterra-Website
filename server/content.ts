@@ -21,22 +21,23 @@ export interface Lore {
   summary: string;
   content: string;
   order: number;
+  loreImage?: string;
 }
 
 export function getDevlogs(): Devlog[] {
   const devlogsPath = path.join(contentDir, 'devlogs');
-  
+
   if (!fs.existsSync(devlogsPath)) {
     return [];
   }
 
   const files = fs.readdirSync(devlogsPath).filter(file => file.endsWith('.md'));
-  
+
   return files.map((filename, index) => {
     const filePath = path.join(devlogsPath, filename);
     const fileContents = fs.readFileSync(filePath, 'utf8');
     const { data, content } = matter(fileContents);
-    
+
     return {
       id: filename.replace('.md', ''),
       title: data.title || filename,
@@ -51,14 +52,14 @@ export function getDevlogs(): Devlog[] {
 
 export function getDevlogById(id: string): Devlog | null {
   const filePath = path.join(contentDir, 'devlogs', `${id}.md`);
-  
+
   if (!fs.existsSync(filePath)) {
     return null;
   }
-  
+
   const fileContents = fs.readFileSync(filePath, 'utf8');
   const { data, content } = matter(fileContents);
-  
+
   return {
     id,
     title: data.title || id,
@@ -72,46 +73,48 @@ export function getDevlogById(id: string): Devlog | null {
 
 export function getLore(): Lore[] {
   const lorePath = path.join(contentDir, 'lore');
-  
+
   if (!fs.existsSync(lorePath)) {
     return [];
   }
 
   const files = fs.readdirSync(lorePath).filter(file => file.endsWith('.md'));
-  
+
   return files.map((filename, index) => {
     const filePath = path.join(lorePath, filename);
     const fileContents = fs.readFileSync(filePath, 'utf8');
     const { data, content } = matter(fileContents);
-    
+
     return {
       id: filename.replace('.md', ''),
       title: data.title || filename,
       category: data.category || 'World',
       summary: data.summary || '',
       content: content,
-      order: typeof data.order === 'number' ? data.order : index
+      order: typeof data.order === 'number' ? data.order : index,
+      ...(data.loreImage ? { loreImage: data.loreImage } : {})
     };
   }).sort((a, b) => a.order - b.order);
 }
 
 export function getLoreById(id: string): Lore | null {
   const filePath = path.join(contentDir, 'lore', `${id}.md`);
-  
+
   if (!fs.existsSync(filePath)) {
     return null;
   }
-  
+
   const fileContents = fs.readFileSync(filePath, 'utf8');
   const { data, content } = matter(fileContents);
-  
+
   return {
     id,
     title: data.title || id,
     category: data.category || 'World',
     summary: data.summary || '',
     content: content,
-    order: typeof data.order === 'number' ? data.order : 0
+    order: typeof data.order === 'number' ? data.order : 0,
+    ...(data.loreImage ? { loreImage: data.loreImage } : {})
   };
 }
 
@@ -126,18 +129,18 @@ export interface SystemDoc {
 
 export function getSystems(): SystemDoc[] {
   const systemsPath = path.join(contentDir, 'systems');
-  
+
   if (!fs.existsSync(systemsPath)) {
     return [];
   }
 
   const files = fs.readdirSync(systemsPath).filter(file => file.endsWith('.md'));
-  
+
   return files.map((filename, index) => {
     const filePath = path.join(systemsPath, filename);
     const fileContents = fs.readFileSync(filePath, 'utf8');
     const { data, content } = matter(fileContents);
-    
+
     return {
       id: filename.replace('.md', ''),
       title: data.title || filename,
@@ -151,14 +154,14 @@ export function getSystems(): SystemDoc[] {
 
 export function getSystemById(id: string): SystemDoc | null {
   const filePath = path.join(contentDir, 'systems', `${id}.md`);
-  
+
   if (!fs.existsSync(filePath)) {
     return null;
   }
-  
+
   const fileContents = fs.readFileSync(filePath, 'utf8');
   const { data, content } = matter(fileContents);
-  
+
   return {
     id,
     title: data.title || id,
@@ -304,7 +307,7 @@ export interface GalleryItem {
 
 export function getGallery(): GalleryItem[] {
   const galleryPath = path.join(contentDir, 'gallery', 'gallery.json');
-  
+
   if (!fs.existsSync(galleryPath)) {
     return [];
   }

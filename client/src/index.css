@@ -49,6 +49,8 @@
 
 :root {
   color-scheme: dark;
+  --mouse-x: 50%;
+  --mouse-y: 50%;
 }
 
 body {
@@ -226,6 +228,174 @@ body {
 
 .animate-scan {
   animation: scan-glint 3s linear infinite;
+}
+
+/* Scroll Reveal Transitions */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  filter: blur(2px);
+  transition:
+          opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+          transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+          filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform, filter;
+}
+
+.scroll-reveal--visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+.scroll-reveal[data-stagger="true"] > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+          opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+          transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scroll-reveal[data-stagger="true"].scroll-reveal--visible > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scroll-reveal[data-stagger="true"].scroll-reveal--visible > *:nth-child(1) { transition-delay: 0ms; }
+.scroll-reveal[data-stagger="true"].scroll-reveal--visible > *:nth-child(2) { transition-delay: 80ms; }
+.scroll-reveal[data-stagger="true"].scroll-reveal--visible > *:nth-child(3) { transition-delay: 160ms; }
+.scroll-reveal[data-stagger="true"].scroll-reveal--visible > *:nth-child(4) { transition-delay: 240ms; }
+.scroll-reveal[data-stagger="true"].scroll-reveal--visible > *:nth-child(5) { transition-delay: 320ms; }
+.scroll-reveal[data-stagger="true"].scroll-reveal--visible > *:nth-child(6) { transition-delay: 400ms; }
+
+.scroll-reveal .section-label {
+  transition-delay: 0ms;
+}
+.scroll-reveal--visible .section-label {
+  transition-delay: 0ms;
+}
+
+.scroll-reveal:not(.scroll-reveal--visible)[data-stagger="true"] > * {
+  transition-delay: 0ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .scroll-reveal[data-stagger="true"] > * {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Ambient System Background */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ambient-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+          linear-gradient(rgba(168, 85, 247, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(168, 85, 247, 0.03) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0, 0, 0, 1) 20%, transparent 70%);
+}
+
+.ambient-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+          600px circle at var(--mouse-x) var(--mouse-y),
+          rgba(168, 85, 247, 0.04),
+          transparent 60%
+  );
+  transition: none;
+}
+
+.ambient-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+.ambient-side {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .ambient-side { display: block; }
+}
+
+@media (min-width: 1536px) {
+  .ambient-side { width: 120px; }
+}
+
+.ambient-side-left { left: 0; }
+.ambient-side-right { right: 0; }
+
+.ambient-coord {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: rgba(168, 85, 247, 0.12);
+  white-space: nowrap;
+}
+
+.ambient-label {
+  position: absolute;
+  left: 8px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(56, 189, 248, 0.1);
+  white-space: nowrap;
+}
+
+.ambient-dot {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(168, 85, 247, 0.15);
+}
+
+.ambient-arc {
+  position: absolute;
+  left: 8px;
+  width: 44px;
+  height: 44px;
+  fill: none;
+  stroke: rgba(168, 85, 247, 0.07);
+  stroke-width: 0.8;
+}
+
+.ambient-arc-right {
+  left: auto;
+  right: 8px;
+  stroke: rgba(56, 189, 248, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-glow {
+    background: radial-gradient(600px circle at 50% 50%, rgba(168, 85, 247, 0.03), transparent 60%);
+  }
 }
 
 /* Systems Archive Tree */

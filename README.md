@@ -215,6 +215,7 @@ title: "Entry Title"
 category: "World"
 summary: "Brief description for the card preview."
 order: 1
+loreImage: "/content/gallery/your-image.png"
 ---
 
 # Entry Title
@@ -232,6 +233,19 @@ Your lore content here using standard Markdown...
 Code blocks for technical data
 \`\`\`
 ```
+
+**Required Frontmatter:**
+| Field | Description |
+|-------|-------------|
+| `title` | Display name in the Archives list |
+| `category` | Category label (see below) |
+| `summary` | Short description shown on the card and Home page lore carousel |
+| `order` | Numeric ordering (lower = first) |
+
+**Optional Frontmatter:**
+| Field | Description |
+|-------|-------------|
+| `loreImage` | Path to an image shown in the Home page lore carousel. Place the image in `content/gallery/` and reference it as `/content/gallery/filename.png`. When omitted, a geometric HUD placeholder is shown instead. |
 
 **Available Categories:**
 | Category | Use For |
@@ -331,8 +345,9 @@ The visual theme is defined in `client/src/index.css`.
 
 ### Add Lore
 1. Create `content/lore/topic-name.md`
-2. Add frontmatter (title, category, summary, order)
+2. Add frontmatter (title, category, summary, order, optional loreImage)
 3. Write Markdown content
+4. To show an image on the Home carousel: add `loreImage: "/content/gallery/filename.png"` to frontmatter
 
 ### Add Gallery Image
 1. Place file in `content/gallery/`
