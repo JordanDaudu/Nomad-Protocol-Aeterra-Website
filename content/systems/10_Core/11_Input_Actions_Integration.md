@@ -4,7 +4,7 @@ summary: "How the project uses Unity Input System via the generated InputSystem_
 order: 11
 status: "In Development"
 tags: ["Core", "Input", "Unity Input System"]
-last_updated: "2026-02-18"
+last_updated: "2026-03-20"
 ---
 
 ## 🧭 Overview
@@ -20,7 +20,7 @@ Provide a scalable input foundation where:
 - Prefer **event-driven** input over manual polling.
 - Keep input subscriptions close to the system that owns the behavior (movement subscribes to Move/Sprint, weapon subscribes to Attack/Reload/etc.).
 
-Trade-off: multiple scripts subscribe to the same `controls` instance, so unsubscribe patterns matter later (see constraints).
+Trade-off: multiple scripts subscribe to the same `controls` instance, so unsubscribe patterns matter (see constraints).
 
 ## 📦 Core Responsibilities
 **Does**
@@ -29,7 +29,7 @@ Trade-off: multiple scripts subscribe to the same `controls` instance, so unsubs
 
 **Does NOT**
 - Provide a custom input abstraction layer (no interfaces or rebinding UI code in this repo yet).
-- Automatically unsubscribe action callbacks (current code relies on object lifetime).
+- Guarantee that every subscriber unsubscribes (some systems already do, others may still rely on object lifetime).
 
 ## 🧱 Key Components
 Classes
@@ -40,6 +40,8 @@ Classes
 Subscription points (real code)
 - `PlayerMovement.AssignInputEvents()`
   - `Move` (performed/canceled), `Sprint` (performed/canceled)
+- `PlayerAbilityController.AssignInputEvents()`
+  - `DiveRoll` (performed) → activates `PlayerRollAbility`
 - `PlayerAim.AssignInputEvents()`
   - `Look` (performed/canceled)
 - `PlayerWeaponController.AssignInputEvents()`
@@ -61,7 +63,10 @@ Subscription points (real code)
 - Movement, aim, weapons, interaction.
 
 ## ⚠ Constraints & Assumptions
-- Subscriptions are not explicitly removed; if you ever disable/enable these components independently, you may double-subscribe.
+- If a component subscribes to input events and later gets disabled/enabled independently, it may double-subscribe unless it unsubscribes.
+- Some systems already implement the safe pattern (subscribe once and unsubscribe in `OnDestroy()`):
+  - `PlayerMovement`
+  - `PlayerAbilityController`
 - `PlayerAim` currently has **temporary debug toggles** using the old input system:
   - `P` toggles precise aim
   - `L` toggles target lock

@@ -4,10 +4,10 @@ summary: "Architecture documentation for the implemented Unity gameplay systems.
 order: 0
 status: "In Development"
 tags: ["Systems", "Documentation"]
-last_updated: "2026-03-14"
+last_updated: "2026-03-20"
 ---
 
-This section documents **the systems that actually exist in the codebase** as of **2026-03-14**.
+This section documents **the systems that actually exist in the codebase** as of **2026-03-20**.
 
 ## 🗂 Index
 
@@ -24,6 +24,7 @@ This section documents **the systems that actually exist in the codebase** as of
 - [Player Movement](./20_Player/21_Player_Movement.md)
 - [Player Aim & Camera Target](./20_Player/22_Player_Aim_and_Camera_Target.md)
 - [Camera Manager (Cinemachine Distance)](./20_Player/23_Camera_Manager.md)
+- [Player Abilities](./20_Player/24_Player_Abilities.md)
 
 ### Combat
 - [Weapons Data (ScriptableObjects)](./30_Combat/30_Weapons_Data_ScriptableObjects.md)
@@ -47,6 +48,13 @@ This section documents **the systems that actually exist in the codebase** as of
 - [Enemy Perception System](./50_Enemy/57_Enemy_Perception_System.md)
 - [Cover System](./50_Enemy/58_Cover_System.md)
 - [Enemy Range Perks & Abilities](./50_Enemy/59_Enemy_Range_Perks_and_Abilities.md)
+- [Enemy Boss (Archetype + Attacks)](./50_Enemy/60_Enemy_Boss_Archetype.md)
+
+### Audio
+- [Audio System Overview](./70_Audio/70_Audio_System_Overview.md)
+- [Audio Cues, Routing & Emitter Pooling](./70_Audio/71_Audio_Cues_Routing_and_Emitter_Pooling.md)
+- [Music Requests & Combat Music Coordinator](./70_Audio/72_Music_Requests_and_CombatMusicCoordinator.md)
+- [Volumes, Mixer Integration & Persistence](./70_Audio/73_Audio_Volumes_Mixer_and_Persistence.md)
 
 ## ✅ Scope Rule
 These docs describe **implemented systems only**. Future features (new enemy archetypes, missions, etc.) are referenced only as *extension points*.

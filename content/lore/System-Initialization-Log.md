@@ -3,6 +3,7 @@ title: "System Initialization Log"
 category: "Archives"
 summary: "Recovered boot sequence from a Nomad core."
 order: 5
+loreImage: "/gallery-images/System_Initialization-Log.png"
 ---
 # System Initialization Log
 

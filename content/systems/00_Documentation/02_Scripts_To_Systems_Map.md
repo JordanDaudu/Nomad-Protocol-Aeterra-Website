@@ -1,43 +1,39 @@
 ---
 title: "Scripts → Systems Map"
-summary: "Mapping of every custom script in the project to its owning system documentation."
+summary: "Mapping of every custom script to its owning system documentation (primary ownership)."
 order: 2
 status: "In Development"
-tags: ["Documentation", "Mapping"]
-last_updated: "2026-03-14"
+tags: ["Systems", "Docs", "Mapping"]
+last_updated: "2026-03-20"
 ---
 
-This page maps **every project script** to the system doc where it belongs.
+Primary ownership mapping (one script → one “home” system doc).
 
-> Note: Script paths are relative to `/code/`.
-
-| System Doc | Script | Path |
+| System Doc | Script/Class | File Path |
 |---|---|---|
-| Core/Object Pooling | `ObjectPool` | `code/ObjectPool.cs` |
-| Core/Object Pooling | `PooledObject` | `code/PooledObject.cs` |
-| Core/Input Actions Integration | `InputActions` | `code/InputActions.cs` |
-| Core/Input Actions Integration | `InputManager` | `code/InputManager.cs` |
-| Player/Player Root Composition | `Player` | `code/Player.cs` |
-| Player/Player Movement | `PlayerMovement` | `code/PlayerMovement.cs` |
-| Player/Player Aim & Camera Target | `PlayerAimAndCameraTarget` | `code/PlayerAimAndCameraTarget.cs` |
+| Core/Object Pooling | `ObjectPool` | `code/Object Pool/ObjectPool.cs` |
+| Core/Object Pooling | `PooledObject` | `code/Object Pool/PooledObject.cs` |
+| Core/Object Pooling | `IPoolable` | `code/Object Pool/IPoolable.cs` |
+| Core/Input Actions Integration | `Player` (enables `InputSystem_Actions`) | `code/Player/Player.cs` |
+| Player/Movement | `PlayerMovement` | `code/Player/PlayerMovement.cs` |
+| Player/Aim & Camera Target | `PlayerAim` | `code/Player/PlayerAim.cs` |
+| Player/Abilities | `PlayerAbility` | `code/Player/Abilities/PlayerAbility.cs` |
+| Player/Abilities | `PlayerAbilityController` | `code/Player/Abilities/PlayerAbilityController.cs` |
+| Player/Abilities | `PlayerRollAbility` | `code/Player/Abilities/PlayerRollAbility.cs` |
 | Player/Camera Manager | `CameraManager` | `code/CameraManager.cs` |
-| Combat/Weapons Data | `WeaponData` | `code/WeaponData.cs` |
-| Combat/Weapon Runtime Model | `Weapon` | `code/Weapon.cs` |
-| Combat/Player Weapon Controller | `PlayerWeaponController` | `code/PlayerWeaponController.cs` |
-| Combat/Weapon Visuals | `PlayerWeaponVisuals` | `code/PlayerWeaponVisuals.cs` |
-| Combat/Weapon Visuals | `PlayerWeaponModel` | `code/PlayerWeaponModel.cs` |
-| Combat/Weapon Visuals | `BackupWeaponModel` | `code/BackupWeaponModel.cs` |
-| Combat/Weapon Visuals | `AimRigController` | `code/AimRigController.cs` |
-| Combat/Weapon Visuals | `WeaponAnimEvents` | `code/WeaponAnimEvents.cs` |
+| Combat/Weapons Data | `WeaponData` | `code/Weapon/WeaponData.cs` |
+| Combat/Weapon Runtime Model | `Weapon` | `code/Weapon/Weapon.cs` |
+| Combat/Weapon Visual Models | `WeaponModel` | `code/Weapon/WeaponModel.cs` |
+| Combat/Weapon Visual Models | `BackupWeaponModel` | `code/Weapon/BackupWeaponModel.cs` |
+| Combat/Player Weapon Controller | `PlayerWeaponController` | `code/Player/PlayerWeaponController.cs` |
+| Combat/Weapon Visuals & Rigging | `PlayerWeaponVisuals` | `code/Player/PlayerWeaponVisuals.cs` |
+| Combat/Weapon Visuals & Rigging | `PlayerAnimationEvents` | `code/Player/PlayerAnimationEvents.cs` |
 | Combat/Projectiles | `Bullet` | `code/Bullet.cs` |
-| Combat/Projectiles | `BulletImpactFx` | `code/BulletImpactFx.cs` |
-| Combat/Projectiles | `EnemyBullet` | `code/Enemy/EnemyBullet.cs` |
-| Combat/Projectiles | `EnemyGrenade` | `code/Enemy/EnemyGrenade.cs` |
-| Interaction & Pickups/Interaction System | `Interactable` | `code/Interactable.cs` |
-| Interaction & Pickups/Interaction System | `InteractionManager` | `code/InteractionManager.cs` |
-| Interaction & Pickups/Pickups | `PickupWeapon` | `code/PickupWeapon.cs` |
-| Interaction & Pickups/Pickups | `PickupAmmo` | `code/PickupAmmo.cs` |
-| Interaction & Pickups/Pickups | `PickupHealth` | `code/PickupHealth.cs` |
+| Interaction | `Interactable` | `code/Interactable.cs` |
+| Interaction | `PlayerInteraction` | `code/Player/PlayerInteraction.cs` |
+| Interaction/Pickups | `PickupWeapon` | `code/Pickups/PickupWeapon.cs` |
+| Interaction/Pickups | `PickupAmmo` | `code/Pickups/PickupAmmo.cs` |
+| Player/Aim & Camera Target | `Target` (aim lock marker) | `code/Target.cs` |
 | Enemy/Core Composition | `Enemy` | `code/Enemy/Enemy.cs` |
 | Enemy/Perception System | `EnemyPerception` | `code/Enemy/Perception/EnemyPerception.cs` |
 | Enemy/State Machine | `EnemyStateMachine` | `code/Enemy/StateMachine/EnemyStateMachine.cs` |
@@ -73,3 +69,30 @@ This page maps **every project script** to the system doc where it belongs.
 | Enemy/Death Pipeline | `EnemyDeathDissolve` | `code/Enemy/EnemyDeathDissolve.cs` |
 | Enemy/Shield & Reactions | `EnemyShield` | `code/Enemy/EnemyShield.cs` |
 | Enemy/Animation Events | `EnemyAnimationEvents` | `code/Enemy/EnemyAnimationEvents.cs` |
+| Enemy/Projectiles | `EnemyAxe` | `code/Enemy/EnemyAxe.cs` |
+| Combat/Projectiles | `EnemyBullet` | `code/Enemy/EnemyBullet.cs` |
+| Combat/Projectiles | `EnemyGrenade` | `code/Enemy/EnemyGrenade.cs` |
+
+| Enemy/Boss Archetype | `EnemyBoss` | `code/Enemy/EnemyBoss/EnemyBoss.cs` |
+| Enemy/Boss Archetype | `EnemyBossVisuals` | `code/Enemy/EnemyBoss/EnemyBossVisuals.cs` |
+| Enemy/Boss Archetype | `IdleState_Boss` | `code/Enemy/EnemyBoss/IdleState_Boss.cs` |
+| Enemy/Boss Archetype | `MoveState_Boss` | `code/Enemy/EnemyBoss/MoveState_Boss.cs` |
+| Enemy/Boss Archetype | `TurnToPlayerState_Boss` | `code/Enemy/EnemyBoss/TurnToPlayerState_Boss.cs` |
+| Enemy/Boss Archetype | `AttackState_Boss` | `code/Enemy/EnemyBoss/AttackState_Boss.cs` |
+| Enemy/Boss Archetype | `JumpAttackState_Boss` | `code/Enemy/EnemyBoss/JumpAttackState_Boss.cs` |
+| Enemy/Boss Archetype | `AbilityState_Boss` | `code/Enemy/EnemyBoss/AbilityState_Boss.cs` |
+| Enemy/Boss Archetype | `DeadState_Boss` | `code/Enemy/EnemyBoss/DeadState_Boss.cs` |
+
+| Audio/System Overview | `AudioManager` | `code/Audio/AudioManager.cs` |
+| Audio/Cues & Emitter Pooling | `AudioCue` | `code/Audio/AudioCue.cs` |
+| Audio/Cues & Emitter Pooling | `PooledAudioEmitter` | `code/Audio/PooledAudioEmitter.cs` |
+| Audio/Music Requests | `CombatMusicCoordinator` | `code/Audio/CombatMusicCoordinator.cs` |
+| Audio/Music Requests | `MusicTrackData` | `code/Audio/MusicTrackData.cs` |
+| Audio/Music Requests | `MusicTrackId` | `code/Audio/MusicTrackId.cs` |
+| Audio/Music Requests | `MusicPriority` | `code/Audio/MusicPriority.cs` |
+| Audio/Volumes & Routing | `AudioBus` | `code/Audio/AudioBus.cs` |
+| Audio/Volumes & Routing | `AudioVolumeChannel` | `code/Audio/AudioVolumeChannel.cs` |
+| Audio/Legacy | `SoundManager` | `code/Audio/SoundManager.cs` |
+
+## 📝 Note
+Some scripts participate in multiple systems (e.g., `Bullet` interacts with `EnemyShield` and `Enemy`). This table shows the *primary* place each script is documented.

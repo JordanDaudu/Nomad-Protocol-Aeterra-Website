@@ -4,13 +4,13 @@ summary: "The Player script as a small composition root and shared access point 
 order: 20
 status: "In Development"
 tags: ["Player", "Composition", "Core"]
-last_updated: "2026-02-18"
+last_updated: "2026-03-20"
 ---
 
 ## 🧭 Overview
 `Player` is a lightweight “composition root” component that:
 - Creates and owns the `InputSystem_Actions` instance.
-- Caches references to the player subsystems (aim, movement, weapons, visuals, interaction).
+- Caches references to the player subsystems (aim, movement, weapons, visuals, interaction, abilities).
 - Enables/disables input with the Unity lifecycle.
 
 ## 🎯 Purpose
@@ -32,6 +32,7 @@ Trade-off: this is a pragmatic “service locator on the player” pattern. It�
   - `PlayerWeaponController`
   - `PlayerWeaponVisuals`
   - `PlayerInteraction`
+  - `PlayerAbilityController`
 - Enable input in `OnEnable()` and disable input in `OnDisable()`.
 
 **Does NOT**
@@ -46,7 +47,7 @@ Classes
 ## 🔄 Execution Flow
 1. `Awake()`
    - `controls = new InputSystem_Actions()`
-   - `GetComponent<...>()` for each subsystem.
+   - `GetComponent<...>()` for each subsystem (including `PlayerAbilityController`).
 2. `OnEnable()` → `controls.Enable()`
 3. `OnDisable()` → `controls.Disable()`
 
@@ -62,6 +63,10 @@ Classes
 - Assumes all subsystems exist on the Player object:
   - If a subsystem is missing, later usage can throw.
 - Cursor visibility is currently commented out (future decision).
+
+## 🧩 Extension Notes
+- `PlayerAbilityController` is optional in the sense that the Player can still move/aim/shoot without it,
+  but any ability input bindings (e.g., DiveRoll) require it to exist on the Player.
 
 ## 📈 Scalability & Extensibility
 - Safe: adding new player subsystems and caching them here.

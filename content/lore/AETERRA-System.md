@@ -3,6 +3,7 @@ title: "AETERRA System"
 category: "World"
 summary: "The reality-simulation network that rebuilt Earth — and corrupted it."
 order: 0
+loreImage: "/gallery-images/Aeterra_System.png"
 ---
 # AETERRA System
 

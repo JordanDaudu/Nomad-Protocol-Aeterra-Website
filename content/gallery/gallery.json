@@ -28,5 +28,11 @@
     "filename": "The_Refresh_Cycle.png",
     "caption": "The Refresh Cycle",
     "type": "image"
+  },
+  {
+    "id": "img-06",
+    "filename": "System_Initialization-Log.png",
+    "caption": "System Initialization Log",
+    "type": "image"
   }
 ]

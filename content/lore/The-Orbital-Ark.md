@@ -3,6 +3,7 @@ title: "The Orbital Ark"
 category: "World"
 summary: "An autonomous orbital archive preserving the last fragments of Earth."
 order: 3
+loreImage: "/gallery-images/The_Orbital_Ark.png"
 ---
 # Orbital Ark
 

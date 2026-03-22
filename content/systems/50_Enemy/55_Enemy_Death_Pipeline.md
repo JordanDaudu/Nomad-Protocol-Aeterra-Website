@@ -4,7 +4,7 @@ summary: "Death sequence combining NavMesh/Animator disable, ragdoll physics, hi
 order: 55
 status: "In Development"
 tags: ["Enemy", "Death", "Ragdoll", "VFX", "Pooling"]
-last_updated: "2026-03-14"
+last_updated: "2026-03-20"
 ---
 
 ## 🧭 Overview
@@ -42,43 +42,43 @@ Provide strong combat feedback (impact + visuals) while remaining stable under p
 
 ## 🧱 Key Components
 States
-- `DeadState_Melee` / `DeadState_Range`
-    - Archetype-specific entry logic and cleanup timing
+- `DeadState_Melee` / `DeadState_Range` / `DeadState_Boss`
+  - Archetype-specific entry logic and cleanup timing
 
 Presentation components
 - `EnemyRagdoll`
-    - Toggles rigidbodies/colliders/animation control
+  - Toggles rigidbodies/colliders/animation control
 - `EnemyDeathDissolve`
-    - Builds dissolve target list and drives dissolve shader parameters
+  - Builds dissolve target list and drives dissolve shader parameters
 
 Shared helper
 - `Enemy.DeathImpact(...)`
-    - Applies a delayed `AddForceAtPosition` so ragdoll settles before impulse
+  - Applies a delayed `AddForceAtPosition` so ragdoll settles before impulse
 
 ## 🔄 Execution Flow
 1. **Hit**
-    - `Bullet` hits enemy → calls `Enemy.GetHit()` (and shield logic if present)
+   - `Bullet` hits enemy → calls `Enemy.GetHit()` (and shield logic if present)
 
 2. **Health reaches 0**
-    - Archetype transitions its FSM into `DeadState_*`
+   - Archetype transitions its FSM into `DeadState_*`
 
 3. **Dead state enter**
-    - Disable `Animator` + `NavMeshAgent`
-    - Enable ragdoll
-    - Start dissolve effect
-    - Start a timer to disable ragdoll colliders after ~1.5s
+   - Disable `Animator` + `NavMeshAgent`
+   - Enable ragdoll
+   - Start dissolve effect
+   - Start a timer to disable ragdoll colliders after ~1.5s
 
 4. **Archetype-specific edge cases**
-    - **Ranged**: `DeadState_Range` forces `EnemyRange.ThrowGrenade()` if the enemy died mid-throw
-        - This prevents the grenade animation from consuming the ability without spawning the grenade.
+   - **Ranged**: `DeadState_Range` forces `EnemyRange.ThrowGrenade()` if the enemy died mid-throw
+     - This prevents the grenade animation from consuming the ability without spawning the grenade.
 
 5. **Pool reuse**
-    - `OnSpawnedFromPool()` restores:
-        - health
-        - battle mode flags
-        - agent + animator enabled state
-        - ragdoll colliders off / kinematic
-        - dissolve materials reset
+   - `OnSpawnedFromPool()` restores:
+     - health
+     - battle mode flags
+     - agent + animator enabled state
+     - ragdoll colliders off / kinematic
+     - dissolve materials reset
 
 ## 🔗 Dependencies
 Depends On
@@ -86,7 +86,7 @@ Depends On
 - Correct dissolve shader setup on all dissolve targets
 
 Used By
-- `EnemyMelee`, `EnemyRange`
+- `EnemyMelee`, `EnemyRange`, `EnemyBoss`
 
 ## ⚠ Constraints & Assumptions
 - Dissolve only affects renderers using a compatible shader (missing dissolve shader will be logged by `EnemyDeathDissolve`).

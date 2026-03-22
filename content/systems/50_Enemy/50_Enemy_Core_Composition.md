@@ -4,11 +4,11 @@ summary: "Base Enemy architecture shared by melee and ranged enemies: health, Na
 order: 50
 status: "In Development"
 tags: ["Enemy", "AI", "Combat", "Pooling", "Perception"]
-last_updated: "2026-03-14"
+last_updated: "2026-03-20"
 ---
 
 ## 🧭 Overview
-`Enemy` is the shared base class for all enemy archetypes (currently: `EnemyMelee`, `EnemyRange`).
+`Enemy` is the shared base class for all enemy archetypes (currently: `EnemyMelee`, `EnemyRange`, `EnemyBoss`).
 
 It provides shared infrastructure:
 - Health + battle-mode lifecycle (`EnterBattleMode()` / `ExitBattleMode()`)
@@ -17,6 +17,11 @@ It provides shared infrastructure:
 - Animation-event relays (states receive `AnimationTrigger()` / `AbilityTrigger()` through `EnemyAnimationEvents`)
 - Pool-safe reset contract (`IPoolable` → `OnSpawnedFromPool()`)
 - Death effect composition hooks (`EnemyRagdoll`, `EnemyDeathDissolve`)
+
+It also exposes combat lifecycle events used by other systems:
+- `BattleModeEntered`
+- `BattleModeExited`
+- `Died`
 
 ## 🎯 Purpose
 Keep common enemy concerns in one place so each archetype can focus on its *behavior loop* (states + actions) without duplicating setup/reset logic.
@@ -32,11 +37,11 @@ Keep common enemy concerns in one place so each archetype can focus on its *beha
 - Track health (`maxHealth`, `currentHealth`) and decrement on `GetHit()`
 - Tick perception each frame (`perception.TickPerception(inBattleMode)`)
 - Decide when to enter battle mode using **visibility-first** logic:
-   - `Enemy.ShouldEnterBattleMode()` checks `EnemyPerception.IsTargetVisible` when available
+  - `Enemy.ShouldEnterBattleMode()` checks `EnemyPerception.IsTargetVisible` when available
 - Provide shared helper queries used by states:
-   - `CanSeePlayer()`
-   - `HasRecentTargetKnowledge()`
-   - `GetKnownPlayerPosition()`
+  - `CanSeePlayer()`
+  - `HasRecentTargetKnowledge()`
+  - `GetKnownPlayerPosition()`
 - Refresh target memory when hit (`GetHit()` calls `perception.RegisterTargetKnowledge(...)`)
 - Provide movement helpers (`StopAgentImmediately()`, `FaceTarget()`, `FaceSteeringTarget()`)
 
@@ -48,17 +53,17 @@ Keep common enemy concerns in one place so each archetype can focus on its *beha
 ## 🧱 Key Components
 Classes
 - `Enemy`
-   - Shared runtime state + perception integration
+  - Shared runtime state + perception integration
 - `EnemyPerception`
-   - Visibility, FOV rules, and last-seen memory
+  - Visibility, FOV rules, and last-seen memory
 - `EnemyRagdoll`, `EnemyDeathDissolve`
-   - Death presentation pipeline
+  - Death presentation pipeline
 - `EnemyAnimationEvents`
-   - Animation-event bridge into the active `EnemyState`
+  - Animation-event bridge into the active `EnemyState`
 
 Interfaces / Data
 - `IPoolable`
-   - Standard pool reset hook (`OnSpawnedFromPool()`)
+  - Standard pool reset hook (`OnSpawnedFromPool()`)
 
 ## 🔄 Execution Flow
 1. `Start()`
@@ -76,7 +81,8 @@ Interfaces / Data
    - Decrements health
 
 4. Pool reuse
-   - `OnSpawnedFromPool()` restores baseline state and resets perception via `EnemyPerception.ResetPerception()` (through `ResetEnemyForReuse()`)
+   - `OnSpawnedFromPool()` restores baseline state via `ResetEnemyForReuse()`
+   - **Note:** perception reset is currently *not* called by the base class. If pooled enemies require memory/visibility to clear, the owning archetype should call `perception.ResetPerception()` during its reset hook.
 
 ## 🔗 Dependencies
 Depends On
@@ -84,8 +90,11 @@ Depends On
 - `EnemyPerception` (required component)
 
 Used By
-- `EnemyMelee`, `EnemyRange`
+- `EnemyMelee`, `EnemyRange`, `EnemyBoss`
 - `Bullet` / `EnemyBullet` (calls `GetHit()`, death impact hook)
+
+Also used by
+- `CombatMusicCoordinator` (subscribes to `BattleModeEntered` / `BattleModeExited` / `Died` to request combat music)
 
 ## ⚠ Constraints & Assumptions
 - Battle-mode entry is visibility-driven when perception exists; if perception is missing (shouldn’t happen due to `RequireComponent`), fallback is distance check.
@@ -94,7 +103,7 @@ Used By
 
 ## 📈 Scalability & Extensibility
 - New archetypes can reuse the same perception + battle-mode contract without duplicating detection logic.
-- Additional “knowledge sources” (sound, alerts, squad comms) can integrate via `EnemyPerception.RegisterTargetKnowledge(position)`.
+- Additional “knowledge sources” (sound, alerts, squad comms) can integrate via `EnemyPerception.RegisterTargetKnowledge()`.
 
 ## ✅ Development Status
 In Development

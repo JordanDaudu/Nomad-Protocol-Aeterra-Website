@@ -3,6 +3,7 @@ title: "The Refresh Cycle"
 category: "World"
 summary: "The system's periodic deletion and reconstruction of corrupted sectors."
 order: 4
+loreImage: "/gallery-images/The_Refresh_Cycle.png"
 ---
 # The Refresh Cycle
 
