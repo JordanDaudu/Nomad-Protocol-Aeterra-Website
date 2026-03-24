@@ -4,6 +4,7 @@ export interface Devlog {
   date: string;
   summary: string;
   content: string;
+  order: number;
   titleColor?: string;
 }
 
@@ -13,38 +14,8 @@ export interface Lore {
   category: "World" | "Faction" | "Tech";
   summary: string;
   content: string;
-}
-
-export async function fetchDevlogs(): Promise<Devlog[]> {
-  const response = await fetch('/api/devlogs');
-  if (!response.ok) {
-    throw new Error('Failed to fetch devlogs');
-  }
-  return response.json();
-}
-
-export async function fetchDevlogById(id: string): Promise<Devlog> {
-  const response = await fetch(`/api/devlogs/${id}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch devlog');
-  }
-  return response.json();
-}
-
-export async function fetchLore(): Promise<Lore[]> {
-  const response = await fetch('/api/lore');
-  if (!response.ok) {
-    throw new Error('Failed to fetch lore');
-  }
-  return response.json();
-}
-
-export async function fetchLoreById(id: string): Promise<Lore> {
-  const response = await fetch(`/api/lore/${id}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch lore');
-  }
-  return response.json();
+  order: number;
+  loreImage?: string;
 }
 
 export interface GalleryItem {
@@ -52,14 +23,6 @@ export interface GalleryItem {
   filename: string;
   caption: string;
   type: "image" | "video" | "gif";
-}
-
-export async function fetchGallery(): Promise<GalleryItem[]> {
-  const response = await fetch('/api/gallery');
-  if (!response.ok) {
-    throw new Error('Failed to fetch gallery');
-  }
-  return response.json();
 }
 
 export interface SystemDoc {
@@ -71,18 +34,40 @@ export interface SystemDoc {
   ost?: string;
 }
 
-export async function fetchSystems(): Promise<SystemDoc[]> {
-  const response = await fetch('/api/systems');
-  if (!response.ok) {
-    throw new Error('Failed to fetch systems');
-  }
+export async function fetchDevlogs(): Promise<Devlog[]> {
+  const response = await fetch('/data/devlogs.json');
+  if (!response.ok) throw new Error('Failed to fetch devlogs');
   return response.json();
 }
 
-export async function fetchSystemById(id: string): Promise<SystemDoc> {
-  const response = await fetch(`/api/systems/${id}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch system');
-  }
+export async function fetchDevlogById(id: string): Promise<Devlog> {
+  const devlogs = await fetchDevlogs();
+  const found = devlogs.find(d => d.id === id);
+  if (!found) throw new Error('Devlog not found');
+  return found;
+}
+
+export async function fetchLore(): Promise<Lore[]> {
+  const response = await fetch('/data/lore.json');
+  if (!response.ok) throw new Error('Failed to fetch lore');
+  return response.json();
+}
+
+export async function fetchLoreById(id: string): Promise<Lore> {
+  const lore = await fetchLore();
+  const found = lore.find(l => l.id === id);
+  if (!found) throw new Error('Lore entry not found');
+  return found;
+}
+
+export async function fetchGallery(): Promise<GalleryItem[]> {
+  const response = await fetch('/data/gallery.json');
+  if (!response.ok) throw new Error('Failed to fetch gallery');
+  return response.json();
+}
+
+export async function fetchSystems(): Promise<SystemDoc[]> {
+  const response = await fetch('/data/systems.json');
+  if (!response.ok) throw new Error('Failed to fetch systems');
   return response.json();
 }

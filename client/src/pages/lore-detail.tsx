@@ -46,11 +46,10 @@ const markdownComponents: Partial<Components> = {
     const loreId = href.replace("./", "");
 
     const handlePrefetch = () => {
-      // Start fetching the data as soon as the user hovers
       queryClient.prefetchQuery({
-        queryKey: ['lore', loreId],
+        queryKey: ['lore'],
         queryFn: () => fetchLoreById(loreId),
-        staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+        staleTime: 5 * 60 * 1000,
       });
     };
 

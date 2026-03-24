@@ -15,9 +15,9 @@ export default function HomeLoreHighlight() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const { data: loreEntries = [], isLoading } = useQuery<LoreEntry[]>({
-    queryKey: ["/api/lore"],
+    queryKey: ["lore"],
     queryFn: async () => {
-      const res = await fetch("/api/lore");
+      const res = await fetch("/data/lore.json");
       if (!res.ok) throw new Error("Failed to fetch lore");
       return res.json();
     },

@@ -26,27 +26,27 @@ interface GalleryItem {
 
 export default function HomeLatestPreviews() {
   const { data: devlogs = [] } = useQuery<Devlog[]>({
-    queryKey: ["/api/devlogs"],
+    queryKey: ["devlogs"],
     queryFn: async () => {
-      const res = await fetch("/api/devlogs");
+      const res = await fetch("/data/devlogs.json");
       if (!res.ok) throw new Error("Failed to fetch devlogs");
       return res.json();
     },
   });
 
   const { data: systems = [] } = useQuery<SystemDoc[]>({
-    queryKey: ["/api/systems"],
+    queryKey: ["systems"],
     queryFn: async () => {
-      const res = await fetch("/api/systems");
+      const res = await fetch("/data/systems.json");
       if (!res.ok) throw new Error("Failed to fetch systems");
       return res.json();
     },
   });
 
   const { data: gallery = [] } = useQuery<GalleryItem[]>({
-    queryKey: ["/api/gallery"],
+    queryKey: ["gallery"],
     queryFn: async () => {
-      const res = await fetch("/api/gallery");
+      const res = await fetch("/data/gallery.json");
       if (!res.ok) throw new Error("Failed to fetch gallery");
       return res.json();
     },
@@ -134,7 +134,7 @@ export default function HomeLatestPreviews() {
                     className="aspect-square border border-border/50 bg-black/40 overflow-hidden"
                   >
                     <img
-                      src={`/content/gallery/${item.filename}`}
+                      src={`/gallery-images/${item.filename}`}
                       alt={item.caption}
                       className="w-full h-full object-cover opacity-70 hover:opacity-100 transition-opacity"
                       data-testid={`img-gallery-${item.id}`}
