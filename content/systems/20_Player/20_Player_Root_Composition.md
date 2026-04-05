@@ -1,80 +1,73 @@
 ---
 title: "Player Root Composition"
-summary: "The Player script as a small composition root and shared access point to player subsystems."
+summary: "The Player class acts as a hub that caches movement/aim/weapons/abilities/visuals and owns core runtime components like PlayerHealth + Ragdoll."
 order: 20
 status: "In Development"
-tags: ["Player", "Composition", "Core"]
-last_updated: "2026-03-20"
+tags: ["Player", "Architecture", "Composition", "Combat", "Health"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-`Player` is a lightweight “composition root” component that:
-- Creates and owns the `InputSystem_Actions` instance.
-- Caches references to the player subsystems (aim, movement, weapons, visuals, interaction, abilities).
-- Enables/disables input with the Unity lifecycle.
+`Player` is a hub component that:
+- caches references to the player subsystems
+- provides a few shared utilities (death/reset, ragdoll toggling)
+- holds the single `InputSystem_Actions` instance
+
+It is intentionally not overloaded with gameplay logic; most behavior lives in dedicated components.
 
 ## 🎯 Purpose
-Avoid repeated `GetComponent<...>()` calls across scripts and provide a stable entry point for player-related systems to talk to each other through `player.<subsystem>` references.
-
-## 🧠 Design Philosophy
-- Keep `Player` minimal: it wires dependencies but doesn’t implement gameplay.
-- Prefer cached component references over repeated lookups.
-- Allow subsystems to depend on `Player` as a shared context.
-
-Trade-off: this is a pragmatic “service locator on the player” pattern. It’s simple and efficient, but it does create coupling between subsystems.
+- Provide a stable “composition root” for the player.
+- Centralize shared references so other systems don’t do repeated `GetComponent` calls.
+- Coordinate global lifecycle actions (death/reset).
 
 ## 📦 Core Responsibilities
 **Does**
-- Instantiate input actions wrapper (`controls`).
-- Cache subsystem references:
-  - `PlayerAim`
+- Own and expose:
   - `PlayerMovement`
+  - `PlayerAim`
   - `PlayerWeaponController`
   - `PlayerWeaponVisuals`
-  - `PlayerInteraction`
-  - `PlayerAbilityController`
-- Enable input in `OnEnable()` and disable input in `OnDisable()`.
+  - `PlayerAbilityController` (abilities framework)
+  - `PlayerHealth` (HP)
+  - `Ragdoll` (physics death / impact reactions)
+  - `InputSystem_Actions`
+- Initialize input actions and enable gameplay action maps.
+- Subscribe to `PlayerHealth.Died` and trigger death behavior.
 
 **Does NOT**
-- Contain player gameplay logic (movement/aim/shooting live in separate scripts).
-- Manage UI, health, damage, etc. (not implemented in this repo).
+- Implement damage routing (that’s hitboxes + health).
+- Implement weapon rules (that’s `Weapon` + `PlayerWeaponController`).
+- Implement aim math (that’s `PlayerAim`).
 
 ## 🧱 Key Components
-Classes
 - `Player` (`Scripts/Player/Player.cs`)
-  - Public read-only accessors for subsystems.
+- `PlayerHealth` (`Scripts/Managers/Components/PlayerHealth.cs`)
+- `Ragdoll` (`Scripts/Ragdoll.cs`)
+- Player subsystems (movement/aim/weapons/abilities)
+
+Related
+- `PlayerHitBox` (`Scripts/Player/PlayerHitBox.cs`)  
+  Hitboxes route damage into `PlayerHealth`.
 
 ## 🔄 Execution Flow
 1. `Awake()`
-   - `controls = new InputSystem_Actions()`
-   - `GetComponent<...>()` for each subsystem (including `PlayerAbilityController`).
-2. `OnEnable()` → `controls.Enable()`
-3. `OnDisable()` → `controls.Disable()`
+   - Creates `InputSystem_Actions`
+   - Enables the default action map
+2. `Start()`
+   - Caches subsystem references
+   - Hooks health death event
+3. On death:
+   - Enables ragdoll
+   - Triggers any player death effects (as implemented)
 
 ## 🔗 Dependencies
-**Depends On**
-- Generated `InputSystem_Actions`.
-- All required player subsystem components must exist on the same GameObject (or it will return null).
-
-**Used By**
-- All player subsystems (they call `GetComponent<Player>()` and then use cached refs).
+- Unity Input System generated actions (`InputSystem_Actions`)
+- Health + ragdoll components
+- Subsystems under `Scripts/Player/...`
 
 ## ⚠ Constraints & Assumptions
-- Assumes all subsystems exist on the Player object:
-  - If a subsystem is missing, later usage can throw.
-- Cursor visibility is currently commented out (future decision).
-
-## 🧩 Extension Notes
-- `PlayerAbilityController` is optional in the sense that the Player can still move/aim/shoot without it,
-  but any ability input bindings (e.g., DiveRoll) require it to exist on the Player.
-
-## 📈 Scalability & Extensibility
-- Safe: adding new player subsystems and caching them here.
-- If coupling becomes an issue later, move toward explicit interfaces or event-driven messaging.
+- Hitboxes must be set up correctly (Player root collider is not expected to be damageable; body part hitboxes are).
+- `Player` assumes a single local player for now.
 
 ## ✅ Development Status
 In Development
-
-## 📝 Notes
-Related devlog:
-- Devlog 01 – Input & Player Controller Setup

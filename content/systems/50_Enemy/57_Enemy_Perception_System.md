@@ -1,122 +1,66 @@
 ---
 title: "Enemy Perception System"
-summary: "Shared visibility + target-memory layer (FOV, LOS checks, last-known position) used by all enemies via EnemyPerception."
+summary: "Shared perception layer for enemies: FOV + LOS checks, target visibility, and short-term target memory (known position + timers)."
 order: 57
 status: "In Development"
-tags: ["Enemy", "AI", "Perception", "FOV", "LOS", "Memory"]
-last_updated: "2026-03-14"
+tags: ["Enemy", "AI", "Perception", "LOS", "Memory"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-`EnemyPerception` is a reusable component that provides a **fair awareness model** for enemies.
+`EnemyPerception` is a reusable component that provides enemies with a believable awareness model.
 
-It answers:
-- **Is the player visible right now?** (`IsTargetVisible`)
-- **Do we still have recent knowledge?** (`HasTargetKnowledge`)
-- **Where should we aim / move toward?** (`KnownTargetPosition`)
+Instead of relying only on distance checks, enemies reason about:
+- **Can I see the target right now?** (FOV + line-of-sight)
+- **Do I remember where the target was recently?** (known position + timer)
 
-This allows enemies to continue behaving intelligently for a short time after losing sight, without “cheating” through walls forever.
+This makes combat behavior more stable and readable:
+- enemies don’t instantly “forget” you when you break LOS for a moment
+- enemies can still throw a grenade or advance toward your last known position
 
 ## 🎯 Purpose
-Replace purely distance-driven awareness with a shared model based on:
-- Field-of-view (initial detection vs. combat)
-- Line-of-sight raycast checks (occlusion)
-- Short-term target memory (last seen position + timer)
-
-## 🧠 Design Philosophy
-- **Visibility is primary**: enemies enter battle when they actually see the target.
-- **Memory is bounded**: enemies remember for a limited time (`memoryDuration`).
-- **Combat can be more forgiving**: combat FOV can be wider than detection FOV so enemies don’t “forget” too easily mid-fight.
-- **No state machine inside perception**: it’s a utility component; states decide what to do with its output.
-
-## 📦 Core Responsibilities
-**Does**
-- Compute visibility each tick:
-    - range check (`sightRange`)
-    - angle check (`detectionViewAngle` / `combatViewAngle`)
-    - line-of-sight raycast (`occlusionMask`)
-- Track last-seen target position and timestamps:
-    - `LastSeenPosition`
-    - `lastSeenTime` / `lastVisibleTime`
-- Expose “knowledge” utilities used by AI states:
-    - `HasTargetKnowledge`
-    - `TimeSinceLastSeen`
-    - `KnownTargetPosition`
-
-**Does NOT**
-- Decide enemy actions (advance, take cover, shoot, etc.)
-- Apply damage or gameplay effects
-- Manage navigation
+- Centralize all sight/awareness logic in one component shared by enemy archetypes.
+- Expose simple query methods to state machines.
 
 ## 🧱 Key Components
-Class
-- `EnemyPerception` (`code/Enemy/Perception/EnemyPerception.cs`)
+- `EnemyPerception` (`Scripts/Enemy/Perception/EnemyPerception.cs`)
+- `CombatTarget` (`Scripts/Managers/Components/CombatTarget.cs`)
+- Used by `Enemy` base and enemy state machines.
 
-Key fields (tuning)
-- Vision
-    - `sightRange`
-    - `detectionViewAngle` (pre-combat)
-    - `combatViewAngle` (in combat)
-    - `occlusionMask`
-- Memory
-    - `memoryDuration`
-    - `lostSightGraceTime`
+## 📦 Responsibilities
+**Does**
+- Track a current `CombatTarget` (Root + AimPoint).
+- Evaluate:
+  - `IsTargetVisible`
+  - `TargetInFOV` (angle check)
+  - LOS raycast using occlusion mask
+- Store knowledge:
+  - `KnownTargetPosition`
+  - `lastSeenTime` / knowledge timeout
+- Provide helper queries:
+  - `CanSeeTarget()`
+  - `HasRecentTargetKnowledge()`
+  - `GetKnownTargetPosition()`
 
-Key properties
-- `IsTargetVisible`
-- `HadVisualContact`
-- `HasTargetKnowledge`
-- `KnownTargetPosition`
-- `TimeSinceLastSeen`
+**Does NOT**
+- Choose which target to follow (base `Enemy` selects the closest `CombatTarget`).
+- Decide which combat state to enter (state machine owns decisions).
 
 ## 🔄 Execution Flow
-1. **Setup**
-    - Owning enemy calls `SetTarget(target, targetAimPoint)`
-    - Ranged enemy typically supplies `playerBody` as aim point for better targeting
-
-2. **Per-frame tick**
-    - Owner calls `TickPerception(inCombat)`
-    - `ComputeVisibility(inCombat)` evaluates:
-        - range
-        - angle (FOV)
-        - raycast hit vs. target transform hierarchy
-
-3. **Visibility results**
-    - If visible:
-        - `IsTargetVisible = true`
-        - `HadVisualContact = true`
-        - `LastSeenPosition = targetAimPoint.position`
-        - `lastSeenTime = now`
-    - If not visible:
-        - `IsTargetVisible` stays true for a short `lostSightGraceTime` to avoid flicker
-        - After grace, visibility becomes false while memory can still be valid via `HasTargetKnowledge`
-
-4. **External knowledge refresh**
-    - When an enemy is hit, `Enemy.GetHit()` calls:
-        - `RegisterTargetKnowledge(knownThreatPosition)`
-    - This refreshes memory without faking direct line-of-sight.
+1. `Enemy` selects the closest valid `CombatTarget` from `CombatTarget.ActiveTargets`.
+2. `Enemy` calls `perception.SetTarget(combatTarget)`.
+3. Each tick, perception evaluates FOV + LOS:
+   - If visible → updates known position + last seen time
+   - If not visible → retains last known position until timeout
+4. State machine reads perception outputs to decide:
+   - battle vs idle
+   - advance vs search vs take cover
+   - grenade throw using recent knowledge window
 
 ## 🔗 Dependencies
-Depends On
-- Unity Physics (`Physics.Raycast`)
-- Correct layer setup (`occlusionMask` should include world + player)
-
-Used By
-- `Enemy` base (`TickPerception`, battle entry)
-- `EnemyRange` (aim/move toward `KnownTargetPosition`)
-- Any future archetype that needs “last known position” reasoning
-
-## ⚠ Constraints & Assumptions
-- Memory is time-based only (no pathfinding validation to last-known position).
-- `KnownTargetPosition` returns live aim point only when `IsTargetVisible == true`; otherwise it returns `LastSeenPosition`.
-- Correct occlusion depends on `occlusionMask` (misconfigured layers will make enemies “blind” or “all-seeing”).
-
-## 📈 Scalability & Extensibility
-- Add sound/alert systems by calling `RegisterTargetKnowledge(position)` without changing perception math.
-- Add alternative aim points (head/chest transforms) via `SetTargetAimPoint(...)`.
+- Accurate layer masks:
+  - occlusion/visibility checks use layer masks (configured in perception)
+- Targets must provide a valid `AimPoint` (for aiming and LOS).
 
 ## ✅ Development Status
 In Development
-
-## 📝 Notes
-This perception system is intentionally shared across melee and ranged enemies so “awareness rules” remain consistent.

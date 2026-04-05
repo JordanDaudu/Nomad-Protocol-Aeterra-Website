@@ -1,123 +1,98 @@
 ---
 title: "Player Weapon Controller"
-summary: "Owns weapon inventory, equips weapons, drives shooting and reloading, and spawns pooled bullets/pickups."
+summary: "Owns weapon inventory, equips weapons, drives shooting and reloading, spawns pooled bullets, and manages drop/pickup rules."
 order: 32
 status: "In Development"
-tags: ["Combat", "Weapons", "Player", "Enemy"]
-last_updated: "2026-03-05"
+tags: ["Combat", "Weapons", "Player"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-`PlayerWeaponController` orchestrates the weapon gameplay loop:
-- Weapon inventory (slots)
-- Equip / drop / pickup behavior
-- Firing logic (semi/auto/burst)
-- Bullet spawning (pooled)
-- Reload flow (animation-driven readiness gate)
-- Camera distance change when equipping a weapon
-- Enemy reaction hook (dodge trigger along bullet path)
+`PlayerWeaponController` is the orchestration layer for the player combat loop:
+- weapon inventory (slots)
+- equip/switch
+- shooting (semi / auto / burst)
+- reloading (animation-gated)
+- weapon pickups + drops (pooled)
+- bullet spawning (pooled) + per-shot setup (damage, speed, layers)
 
 ## 🎯 Purpose
-Provide one place that translates player input into weapon gameplay outcomes while keeping:
-- Weapon rules inside `Weapon`
-- Visuals inside `PlayerWeaponVisuals`
-- Pooling inside `ObjectPool`
+Translate player input into weapon gameplay outcomes while keeping:
+- weapon rules inside `Weapon`
+- visuals inside `PlayerWeaponVisuals`
+- pooling inside `ObjectPool`
 
 ## 🧠 Design Philosophy
-- Treat `weaponReady` as a simple combat gate:
-  - false during equip/reload/burst
-  - true when animation events confirm completion
-- Use input `performed/canceled` to support auto firing without per-frame input polling.
-- Keep pickup/drop logic rule-based to avoid “if spaghetti”.
-
-Trade-off: controller currently owns multiple concerns (inventory + firing + pickups). This is fine at current scale, but may split later.
+- Use a simple `weaponReady` gate controlled by animation events.
+- Keep pickup/drop logic rule-based (predictable behavior).
+- Prefer pooled objects for bullets and dropped pickups.
 
 ## 📦 Core Responsibilities
 **Does**
 - Create starting weapon from `defaultWeaponData`.
-- Equip weapon by slot index and trigger equip animation.
-- Set camera distance via `CameraManager`.
-- Handle pickup rules:
-  1) If weapon already owned → convert pickup into ammo (adds picked weapon’s `bulletsInMagazine` into existing weapon’s reserve)
+- Manage `weaponSlots` and equip by index.
+- Fire bullets using pooling:
+  - Uses `PlayerAim.BulletDirection()` and `Weapon.ApplySpread(...)`
+  - Calls `Bullet.BulletSetup(...)` with:
+    - direction, speed, damage, source
+    - friendly layer mask
+    - bullet layer (player bullet layer)
+- Drive reload flow via animation events:
+  - `Reload()` triggers animation, waits for `ReloadIsOver()` event
+- Handle pickup/drop rules:
+  1) If weapon already owned → convert pickup into ammo (adds pickup magazine ammo into reserve)
   2) If inventory full and different type → replace current weapon and drop old as pickup
-  3) Else → add weapon and enable backup visuals
-- Drop current weapon as a pooled pickup object.
-- Fire bullets using pooling and per-weapon spread.
-- Trigger reload animation and rely on animation event to refill ammo.
-- Trigger enemy dodge reaction with a raycast along the fired shot direction (before spread is applied).
+  3) Else → add weapon and update backup weapon visuals
+- Drop current weapon as a pooled `PickupWeapon` object.
 
 **Does NOT**
-- Control weapon visuals directly (delegates to `PlayerWeaponVisuals`).
-- Implement aim raycasting (delegates to `PlayerAim`).
-- Apply damage numbers (enemy health decrement lives in `Enemy.GetHit()` today).
+- Apply damage directly (damage is applied by `Bullet` → `IDamageable.TakeDamage`).
+- Handle hitboxes/health logic (see Damage & Hitboxes System).
 
 ## 🧱 Key Components
 Classes
-- `PlayerWeaponController` (`code/Player/PlayerWeaponController.cs`)
+- `PlayerWeaponController` (`Scripts/Player/PlayerWeaponController.cs`)
 - `Weapon` runtime model
-- `WeaponData` (starting weapon)
-- `ObjectPool` (bullets + dropped weapon pickups)
+- `WeaponData`
+- `Bullet` (`Scripts/Bullet.cs`)
+- `PickupWeapon` (`Scripts/Interaction/Pickups/PickupWeapon.cs`)
+- `ObjectPool` (`Scripts/ObjectPool/ObjectPool.cs`)
 
-Unity references
+Key config fields
+- `defaultWeaponData`
 - `bulletPrefab`
 - `weaponPickupPrefab`
-- `Transform weaponHolder` (declared but not used in current code)
+- `friendlyLayer` (layers considered “friendly” to the player)
+- `playerBulletLayer` (the layer bullets should be set to when fired by the player)
 
-## 🔄 Execution Flow
+## 🔄 Execution Flow (high level)
 1. `Start()`
    - Cache `Player`
-   - Subscribe to input events
-   - `Invoke(EquipStartingWeapon, 0.1f)` (delayed initialization)
-2. `Update()`
-   - If `isShooting` → call `Shoot()`
-3. Equip flow
-   - `EquipWeapon(slotIndex)`
-     - `weaponReady = false`
-     - Set `currentWeapon`
-     - `player.weaponVisuals.PlayWeaponEquipAnimation()`
-     - `CameraManager.ChangeCameraDistance(currentWeapon.cameraDistance)`
-   - Animation event `WeaponEquipingIsOver()` sets `weaponReady = true`
-4. Shooting flow
-   - If not ready → return
-   - If `currentWeapon.CanShoot()` false → return
-   - **Enemy reaction hook**: `TriggerEnemyDodge()` raycasts along `BulletDirection()` before spread is applied
-   - Trigger fire animation
-   - If semi-auto → reset `isShooting = false`
-   - If burst active → coroutine fires bullets with delay, then sets ready true
-   - Else fire single bullet
-5. Reload flow
-   - Input triggers `Reload()` only if `currentWeapon.CanReload()` and `weaponReady`
-   - `Reload()` sets ready false and triggers reload animation
-   - Animation event `ReloadIsOver()` calls `RefillBullets()` and sets ready true
-6. Drop flow
-   - If only one weapon → ignore
-   - Spawn pooled `weaponPickupPrefab` and `SetupPickupWeapon(currentWeapon, playerTransform)`
-   - Remove current weapon and equip slot 0
+   - Hook input events
+   - Equip starting weapon
+2. Shooting
+   - Input sets `isShooting`
+   - Update calls `Shoot()` while held (auto) or once (semi)
+   - Spawn pooled bullet and setup with damage/speed/layers
+3. Reload
+   - Trigger reload animation
+   - Animation event calls `ReloadIsOver()` → `RefillBullets()` → `weaponReady = true`
+4. Drop
+   - Spawn pooled pickup and inject the runtime `Weapon` instance
+   - Remove weapon from slots and equip another
 
 ## 🔗 Dependencies
-**Depends On**
+Depends On
 - `Player` (aim + visuals)
-- `ObjectPool` (bullets + pickups)
-- `CameraManager` (camera distance)
-- Unity: coroutines, Rigidbody physics
+- `ObjectPool` (bullets + dropped pickups)
+- Unity: coroutines, physics
 
-**Used By**
-- `PickupWeapon` calls `weaponController.PickupWeapon(weapon)` (via inherited reference in `Interactable`).
+Used By
+- `PickupWeapon.Interaction()` calls `weaponController.PickupWeapon(weapon)`
 
 ## ⚠ Constraints & Assumptions
-- `weaponSlots[0] = new Weapon(defaultWeaponData);` assumes `weaponSlots` list is pre-sized in Inspector.
-- EquipSlot1..5 input calls `EquipWeapon(0..4)` but `maxWeaponSlots` defaults to 2 — extra slots will log “No weapon in this slot!” unless list is populated.
-- `weaponHolder` is currently unused (potential future attachment point).
-- Enemy dodge trigger uses a single raycast and triggers `EnemyMelee.ActivateDodgeRoll()` if an enemy is hit.
-
-## 📈 Scalability & Extensibility
-- Add dedicated inventory model if weapon logic grows (not required yet).
-- Add UI ammo display by reading `CurrentWeapon()` state.
-- Add new weapon types by creating new `WeaponData` assets and adding weapon models.
-- Extend enemy reaction hooks (stagger, suppression) while keeping the firing order deterministic.
-
-## ✅ Development Status
-In Development
+- `weaponSlots` and `maxWeaponSlots` must match your intended inventory UI.
+- `friendlyLayer` and `playerBulletLayer` must align with your Unity Layer Collision Matrix and hurtbox layers.
 
 ## 📝 Notes
-- Ammo persistence on drop/re-pickup is achieved by passing the same runtime `Weapon` instance through the pooled `PickupWeapon` object.
+- Ammo/state persistence on drop → pickup is achieved by passing the **same runtime `Weapon` instance** into the pooled pickup object (`PickupWeapon.SetupPickupWeapon(...)`).

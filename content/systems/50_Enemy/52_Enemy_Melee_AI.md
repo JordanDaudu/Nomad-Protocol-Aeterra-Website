@@ -1,103 +1,88 @@
 ---
 title: "Enemy Melee AI"
-summary: "NavMesh-driven patrol/chase + animation-driven melee attacks, recovery decisions, variant abilities, and death sequencing (with shared perception + target memory)."
+summary: "NavMesh-driven patrol/chase + animation-driven melee windows, with optional shield + axe throw variants, and damage applied through the shared DamageInfo/IDamageable pipeline."
 order: 52
 status: "In Development"
-tags: ["Enemy", "AI", "Melee", "NavMesh", "Animation", "Perception"]
-last_updated: "2026-03-14"
+tags: ["Enemy", "AI", "Melee", "NavMesh", "Animation", "Damage"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-`EnemyMelee` is the first full combatant archetype. It uses:
-- `NavMeshAgent` for patrol/chase
-- A reusable FSM with melee-specific states
-- Animation events for movement/rotation gating and ability timing
-- Variant behaviors (Shield / Dodge / AxeThrow)
-- A death pipeline (ragdoll + dissolve)
+`EnemyMelee` is a close-combat archetype built on the shared `Enemy` base.
 
-(See Devlog 09 for the development narrative.)
+It uses:
+- `NavMeshAgent` for patrol + chase
+- A melee state machine (idle/move/chase/attack/recovery/ability/dead)
+- Animation events to open/close attack windows
+- Variant abilities (shield durability, axe throw)
 
 ## 🎯 Purpose
-Provide a scalable template for enemy combatants where:
-- Navigation feels natural (patrol → chase)
-- Attacks are synced to animation
-- Adding variants mostly becomes *data + visuals*, not rewriting AI
+Provide a melee enemy that feels:
+- readable (attack windows synced to animation)
+- fair (hit checks only during intended frames)
+- extensible (variants via data + small components)
 
 ## 🧠 Design Philosophy
-- **Decision hub via Recovery state**: actions funnel through a predictable decision point.
-- **Manual movement/rotation during attacks**: animation events explicitly enable/disable manual movement.
-- **Variants as configuration**: same state machine, different flags/weapon models/attack data.
-- **Shared perception layer**: battle entry is driven by `EnemyPerception` visibility, and target memory refreshes when hit.
+- **State machine clarity**: combat decisions funnel through predictable states.
+- **Animation-driven damage windows**: attack checks only run when enabled by events.
+- **Precision damage**: melee hits target colliders in `targetLayers` that implement `IDamageable` (usually hitboxes).
 
 ## 📦 Core Responsibilities
 **Does**
-- Build and tick melee states (`EnemyStateMachine`)
-- Patrol between points (Idle/Move)
-- Enter battle mode when the player is *seen* (via `EnemyPerception.IsTargetVisible`) or when hit
-- Chase + attack using NavMesh + animation timing
-- Route variant abilities through dedicated states (e.g., axe throw)
-- Run the shared death pipeline (ragdoll + dissolve)
+- Build and tick melee states (`EnemyStateMachine`).
+- Patrol (Idle/Move) and chase (Chase).
+- Trigger melee animations and enable hit checks through `EnemyAnimationEvents`.
+- Apply melee damage via `Enemy.MeleeAttackCheck(...)` (OverlapSphere at damage points).
+- Execute axe throw using a pooled `EnemyAxe` projectile.
+- Support shield variants via `EnemyShield` (durability-based IDamageable).
 
 **Does NOT**
-- Handle perception logic itself (delegated to `EnemyPerception`)
-- Apply projectile damage (handled by projectiles / hit logic)
-- Implement cover logic (ranged-only system currently)
+- Perform perception math (handled by `EnemyPerception`).
+- Apply bullet damage logic (handled by `Bullet` + hitboxes).
+- Handle cover (ranged-only system currently).
 
 ## 🧱 Key Components
-Classes
-- `EnemyMelee`
-    - Builds melee FSM and owns melee configuration (attack ranges, ability toggles)
-- Melee states (selection varies by variant)
-    - `ChaseState_Melee`, `AttackState_Melee`, `RecoveryState_Melee`, `AbilityState_Melee`, `DeadState_Melee`, etc.
-- `EnemyPerception`
-    - Shared visibility + memory component used by `Enemy` base (and therefore by melee)
+- `EnemyMelee` (`Scripts/Enemy/EnemyMelee/EnemyMelee.cs`)
+- Melee states (`Scripts/Enemy/EnemyMelee/States/...`)
+- Shared base systems:
+  - `Enemy` (`Scripts/Enemy/Enemy.cs`)
+  - `EnemyPerception` (`Scripts/Enemy/Perception/EnemyPerception.cs`)
+  - `EnemyHealth` (`Scripts/Managers/Components/EnemyHealth.cs`)
+  - `EnemyAnimationEvents` (`Scripts/Enemy/EnemyAnimationEvents.cs`)
 
-Variant helpers
-- `EnemyShield` (`code/Enemy/EnemyShield.cs`) for shield variants
-- `EnemyAxe` (`code/Enemy/EnemyAxe.cs`) for axe throw ability
+Variants / helpers
+- `EnemyShield` (`Scripts/Enemy/EnemyShield.cs`)
+- `EnemyAxe` (`Scripts/Enemy/EnemyAxe.cs`)
 
-## 🔄 Execution Flow
+## 🔄 Execution Flow (combat loop)
 1. Spawn
-    - `EnemyMelee.Awake()` builds all melee states
-    - `Start()` initializes FSM to `IdleState_Melee`
-2. Patrol loop
-    - Idle → Move between patrol points via agent
-3. Battle-mode entry
-    - `Enemy.Update()` ticks perception and calls `EnterBattleMode()` when `EnemyPerception.IsTargetVisible` becomes true
-    - Being hit also refreshes target knowledge and forces battle (`Enemy.GetHit()`)
-4. Combat loop
-    - **Chase**: sets agent destination toward player (currently uses live `player.position`)
-    - **Attack**: triggers animation; movement/rotation is controlled by animation events
-    - **Recovery**: selects next action (chase/attack/ability)
-    - **Ability**: executes variant ability (e.g., axe throw) on ability event timing
-5. Death
-    - Dead state disables agent/animator, enables ragdoll, starts dissolve, and schedules collider shutdown
+   - State machine starts in Idle.
+2. Patrol
+   - Idle ⇄ Move between patrol points.
+3. Engage
+   - Target selection + perception handled in base `Enemy.Update()`.
+   - On visibility (or on hit), enemy enters battle mode.
+4. Chase → Attack
+   - Chase steers via `NavMeshAgent`.
+   - Attack triggers animation:
+     - events call `EnableMeleeAttackCheck(true/false)`
+     - events call `MeleeAttackCheck(...)` during the damage window
+5. Recovery / Ability
+   - Recovery chooses next action:
+     - continue chasing
+     - start another attack
+     - throw axe (if enabled / in range)
+6. Death
+   - `EnemyHealth.Died` triggers base death pipeline (ragdoll + dissolve).
+
+## 🧨 Damage Application (melee + axe)
+- **Melee**: OverlapSphere finds colliders in `targetLayers`.
+  - Applies `DamageInfo` to `IDamageable` colliders (hitboxes/shields).
+- **Axe**: The thrown `EnemyAxe` carries a `DamageInfo` payload and applies it on trigger hit.
 
 ## 🔗 Dependencies
-Depends On
-- `Enemy` base (health, perception integration, patrol, reset)
-- Unity: `NavMeshAgent`, `Animator`
-- `EnemyAnimationEvents` (timing)
-- Variant components (`EnemyShield`, `EnemyAxe`) when enabled
-
-Used By
-- Encounter spawning
-- Player bullet pipeline (`Bullet` → `Enemy.GetHit()`)
-
-## ⚠ Constraints & Assumptions
-- The melee chase state currently keeps steering toward the player’s live position; it does not yet fully commit to `GetKnownPlayerPosition()` (target memory usage is minimal for melee today).
-- Perception memory is still used indirectly:
-    - Battle entry is visibility-driven
-    - Memory refresh occurs on `GetHit()`
-
-## 📈 Scalability & Extensibility
-- Add new melee variants by:
-    - extending `EnemyVisuals` weapon model selection
-    - adding a new ability state or recovery decision branch
-    - keeping the same state machine foundation
+- Unity: `NavMeshAgent`, physics, animator
+- Correct layer setup (`targetLayers` must include the hurtbox layers you want to damage)
 
 ## ✅ Development Status
 In Development
-
-## 📝 Notes
-For the shared perception model, see `57_Enemy_Perception_System.md`.

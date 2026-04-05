@@ -1,75 +1,64 @@
 ---
 title: "Weapons Data (ScriptableObjects)"
-summary: "WeaponData assets define static tuning and defaults for each weapon type."
+summary: "WeaponData assets define player weapon stats (fire rate, magazine, damage, spread, bullet speed, recoil, camera distance) and are used to construct runtime Weapon instances."
 order: 30
 status: "In Development"
-tags: ["Combat", "Weapons", "Data-Driven", "ScriptableObjects"]
-last_updated: "2026-02-19"
+tags: ["Combat", "Weapons", "ScriptableObjects", "DataDriven"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-Weapons are configured using a `WeaponData : ScriptableObject` asset. These assets define **static defaults** and tuning values. Runtime state is stored in the `Weapon` class (see Weapon Runtime Model doc).
+Player weapons are configured using `WeaponData` ScriptableObjects.
 
-Current weapon assets in the repo:
-- `Weapon_Auto-Rifle_D.asset`, `Weapon_Pistol_D.asset`, `Weapon_Revolver_D.asset`, `Weapon_Rifle_D.asset`, `Weapon_Shotgun_D.asset`
+A `WeaponData` is **static tuning** (what the weapon *is*).  
+A runtime `Weapon` instance is **mutable state** (ammo remaining, cooldown timers, etc.).
+
+This split keeps the system scalable:
+- Designers can tweak weapons without touching code.
+- Runtime state stays per-weapon-instance (not shared across all users of the asset).
 
 ## 🎯 Purpose
-Enable data-driven iteration:
-- Balance weapon stats in the Inspector.
-- Add new weapons by creating new assets (without changing code).
-
-## 🧠 Design Philosophy
-- Keep static configuration (design-time) separate from runtime state (ammo usage, cooldown timestamps).
-- Prefer ScriptableObjects for tuning in Unity.
-
-Trade-off: the runtime weapon still stores ammo values that originate from data; changes to an asset won’t retroactively change an already-instantiated `Weapon` instance.
+- Make weapon balancing data-driven.
+- Allow the same weapon type to be instantiated multiple times with independent ammo/timers.
 
 ## 📦 Core Responsibilities
-**Does**
-- Store default values for:
-  - Ammo (magazine, capacity, reserve)
-  - Shoot mode (semi/auto)
-  - Fire rate, bullets-per-shot
-  - Burst settings (optional)
-  - Spread settings
-  - Weapon-specific tuning (reload/equip speed, gun distance, camera distance)
-- Provide a single source of truth for weapon defaults.
+**WeaponData does**
+- Store weapon tuning values (serialized in assets).
+- Provide read-only properties used by `Weapon`.
 
-**Does NOT**
-- Track runtime weapon state (current ammo after firing, last fire timestamps, current spread).
-- Implement weapon behavior (shooting, reloading, equipping are in controller/runtime model).
+**WeaponData does NOT**
+- Track runtime ammo or cooldowns.
+- Spawn bullets or play animations.
 
 ## 🧱 Key Components
-Data
-- `WeaponData` (`Scripts/Weapon/WeaponData.cs`)
-  - `CreateAssetMenu`: `"ScriptableObjects/Weapon Data"`
+Classes
+- `WeaponData` (`Scripts/Player/Weapon/WeaponData.cs`)
+- `Weapon` runtime model (`Scripts/Player/Weapon/Weapon.cs`)
+
+Key fields in `WeaponData` (high-level)
+- Identity: `weaponType`, `weaponName`
+- Fire: `fireMode` (Semi / Auto / Burst), `fireRate`, `burstCount`, `burstDelay`
+- Ammo: `magazineSize`, `startingAmmo`, `maxReservedAmmo`
+- Damage: `damage` *(used to build `DamageInfo` for bullets)*
+- Projectile: `bulletSpeed`, `weaponSpread`
+- Feel: `recoilForce`, `reloadTime`
+- Camera: `cameraDistance`
+- UI/Visuals: optional references depending on your setup
 
 ## 🔄 Execution Flow
-1. Designer creates/edits `WeaponData` assets in Inspector.
-2. Runtime creates a `Weapon` instance using `new Weapon(weaponData)`.
-3. `Weapon` copies data values into runtime fields.
+1. The player starts with a `defaultWeaponData`.
+2. `PlayerWeaponController` constructs a runtime weapon:
+   - `new Weapon(defaultWeaponData)`
+3. Firing reads values from the asset (fire rate, spread, damage), but updates runtime state (ammo/cooldowns).
 
 ## 🔗 Dependencies
-**Depends On**
-- Unity `ScriptableObject`.
-- Enums `WeaponType`, `ShootType` (declared in `Weapon.cs`).
+Used By
+- `PlayerWeaponController` (weapon creation + combat loop)
+- `PickupWeapon` (world pickups use `WeaponData` to create a fresh runtime `Weapon` when the pickup is not a dropped weapon)
 
-**Used By**
-- `Weapon` constructor reads from `WeaponData`.
-- `PlayerWeaponController` spawns a starting weapon from `defaultWeaponData`.
-- `PickupWeapon` uses `weaponData` to create pickup weapons.
-
-## ⚠ Constraints & Assumptions
-- Ammo fields exist in `WeaponData` even though they are runtime-like; they serve as defaults for the runtime instance.
-- Ranges are used for Inspector tuning (reload/equip/gun/camera distance).
-
-## 📈 Scalability & Extensibility
-- Add new tuning fields here only when they are truly “static config”.
-- Future: upgrades/mods would likely be separate assets layered on top (not implemented yet).
+## ⚠ Notes on ammo persistence
+- **ScriptableObjects do not store ammo**.
+- Ammo persistence across drop → pickup is achieved by passing the **same runtime `Weapon` instance** into the pooled pickup object (`PickupWeapon.SetupPickupWeapon(...)`).
 
 ## ✅ Development Status
 In Development
-
-## 📝 Notes
-Related devlog:
-- Devlog 07 – Data-driven weapons (ScriptableObjects)

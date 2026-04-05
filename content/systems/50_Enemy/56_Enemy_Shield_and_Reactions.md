@@ -1,65 +1,41 @@
 ---
-title: "Enemy Shield & Reactions"
-summary: "Shield durability reduction, hit reactions, and bullet-driven enemy feedback hooks (shield first, then enemy)."
+title: "Enemy Shield & Durability Reactions"
+summary: "Durability-based shield implemented as an IDamageable collider; absorbs bullets until broken, then disables itself and updates enemy visuals."
 order: 56
 status: "In Development"
-tags: ["Enemy", "Combat", "Shield"]
-last_updated: "2026-03-05"
+tags: ["Enemy", "Combat", "Shield", "Damage", "Hitboxes"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-Some melee variants include defensive behavior via `EnemyShield`.
-Bullet collision resolves:
-1) Shield (if hit collider is shield)
-2) Else enemy (parent lookup)
+Some melee enemies can spawn with a defensive `EnemyShield` object.
 
-This ensures shield durability absorbs bullets before health is reduced.
+The shield is a dedicated collider that implements `IDamageable`:
+- bullets hit it first (because it has a collider in the hurtbox layer setup)
+- each hit reduces durability
+- once durability reaches 0, the shield disables itself and the enemy can switch animations/behavior accordingly
 
 ## 🎯 Purpose
-Support melee variants that feel tankier and create readable combat feedback:
-- bullets chip shield durability
-- shield breaking changes threat profile (gameplay tuning extension point)
-
-## 🧠 Design Philosophy
-- Shield is a separate component, often on a child collider.
-- Bullet hit logic stays simple and order-dependent.
-
-## 📦 Core Responsibilities
-**Does**
-- `EnemyShield` exposes durability reduction API (`ReduceDurability()`)
-- `Bullet` prioritizes `EnemyShield` on the hit collider
-- `Enemy.GetHit()` handles base health decrement and battle-mode entry
-
-**Does NOT**
-- Implement damage numbers/health UI (not in scope yet)
+- Add variety to melee enemies without creating a new enemy class.
+- Create a readable “break the shield first” gameplay loop.
 
 ## 🧱 Key Components
-Classes
-- `EnemyShield` (`code/Enemy/EnemyShield.cs`)
-- `Bullet` (`code/Bullet.cs`) collision logic
-- `Enemy` (`code/Enemy/Enemy.cs`) base hit behavior
+- `EnemyShield` (`Scripts/Enemy/EnemyShield.cs`)
+- `IDamageable` (`Scripts/Interfaces/IDamageable.cs`)
+- `Bullet` (`Scripts/Bullet.cs`) *(applies damage to any IDamageable collider it hits)*
+- `EnemyMelee` initializes durability for shield variants (implementation detail in enemy script)
 
 ## 🔄 Execution Flow
-1. Bullet collides
-2. Bullet spawns impact FX and returns itself to pool
-3. Bullet checks `collision.gameObject.GetComponent<EnemyShield>()`
-   - if found: `ReduceDurability()` and return
-4. Else bullet finds `Enemy` via `GetComponentInParent<Enemy>()`
-   - calls `GetHit()`
-   - calls `DeathImpact()` with travel-direction impulse
+1. Bullet collides with shield collider.
+2. Bullet queries `IDamageable` on the collider and calls `TakeDamage(DamageInfo)`.
+3. `EnemyShield` reduces `currentDurability` by `damageInfo.Amount`.
+4. If durability hits 0:
+   - shield disables itself
+   - optional `OnShieldBroken` event can be used to switch visuals/animations
 
 ## 🔗 Dependencies
-**Depends On**
-- Bullet collision setup (shield collider must receive collision)
-
-**Used By**
-- Shield melee variants
-
-## ⚠ Constraints & Assumptions
-- Shield must be on the collider that is actually hit (bullet checks the direct hit object for `EnemyShield`).
-
-## 📈 Scalability & Extensibility
-- Add shield break states (visual cracks, disable collider, swap chase speed) without changing bullet logic.
+- Shield collider must be on a layer that bullets can collide with.
+- Enemy visuals/animations should listen for shield state changes (as implemented).
 
 ## ✅ Development Status
 In Development

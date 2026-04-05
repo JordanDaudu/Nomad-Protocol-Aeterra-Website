@@ -1,98 +1,52 @@
 ---
 title: "Player Aim & Camera Target"
-summary: "Mouse-world aiming, laser visualization, optional target lock, and camera look-ahead target movement."
+summary: "Converts mouse position into a world aim point, rotates the player and weapon, and supports optional lock-on via LockOnTarget markers."
 order: 22
 status: "In Development"
-tags: ["Player", "Aim", "Camera", "Combat"]
-last_updated: "2026-02-18"
+tags: ["Player", "Combat", "Aim", "Camera", "Targeting"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-`PlayerAim` controls:
-- Converting mouse screen position into a world hit point (`GetMouseHitInfo()`).
-- Positioning an `aim` Transform in the world.
-- Rendering an aim laser using `LineRenderer`.
-- Moving a `cameraTarget` Transform to create camera look-ahead.
-- Optional target-lock behavior using a `Target` marker component.
+`PlayerAim` is responsible for:
+- computing a world-space aim point from mouse position
+- producing a forward `BulletDirection()` used by weapons
+- rotating the player smoothly toward aim
+- optional lock-on behavior by selecting a `LockOnTarget`
+
+The camera target is a separate transform updated to follow the aim point for a “look toward mouse” feel.
 
 ## 🎯 Purpose
-Create readable, satisfying top-down aiming:
-- The player character rotates toward aim (via `PlayerMovement`).
-- Bullets fire toward `aim` (via `PlayerWeaponController`).
-- The camera subtly shifts toward aim direction for better situational awareness.
-
-## 🧠 Design Philosophy
-- Aim is treated as its own system, not a byproduct of camera rotation.
-- Visual feedback (laser) is driven by weapon readiness to prevent “aiming while reloading/equipping”.
-- Target lock uses a lightweight marker (`Target`) instead of heavy AI dependencies.
-
-Trade-off: `PlayerAim` currently mixes aim + camera target logic in one script for simplicity.
-
-## 📦 Core Responsibilities
-**Does**
-- Track mouse input from `controls.Player.Look`.
-- Raycast from `Camera.main` into `aimLayerMask`.
-- Keep a last-known hit point to avoid aim snapping when raycast misses.
-- Update laser positions (including a small “laser tip” segment).
-- Position `cameraTarget` using a clamped look-ahead distance.
-
-**Does NOT**
-- Change Cinemachine camera distance (handled by `CameraManager`).
-- Handle actual firing logic (handled by `PlayerWeaponController`).
+Keep aim math and camera-target logic isolated from movement/weapon code.
 
 ## 🧱 Key Components
-Classes
 - `PlayerAim` (`Scripts/Player/PlayerAim.cs`)
-- `Target` (`Scripts/Target.cs`)
-  - Simple marker; on `Start()` forces its GameObject layer to `Enemy`.
+- `LockOnTarget` (`Scripts/LockOnTarget.cs`)
+- Camera target transform (scene object referenced by player)
+- Layer masks:
+  - ground/aim plane
+  - lock-on target layers (EnemyHurtBox)
 
-Unity components / references
-- `LineRenderer` (aim laser)
-- `Transform aim` (world-space aim point)
-- `Transform cameraTarget` (camera follow/look-ahead target)
-- LayerMask `aimLayerMask` (controls what aim raycast can hit)
-
-## 🔄 Execution Flow
-1. `Start()`
-   - Cache `Player`
-   - Subscribe to `Look` input action
-2. `Update()`
-   - (Temporary) debug toggles for precise aim / target lock using old input system (`P` and `L`)
-   - `UpdateAimVisuals()`
-     - Laser is enabled only when `player.weapon.WeaponReady() == true`
-     - Weapon model is oriented to aim
-     - Laser end point uses raycast against world to stop on obstacles
-   - `UpdateAimPosition()`
-     - If target lock enabled and a `Target()` exists → aim snaps to target center
-     - Else aim uses mouse hit point
-     - If not precise aim → aim.y is flattened to player height + 1
-   - `UpdateCameraPosition()`
-     - Moves `cameraTarget` toward `DesiredCameraPosition()` using `Lerp`
+## 🔄 Execution Flow (high level)
+1. Each frame:
+   - Raycast from screen mouse position to world (aim plane / ground).
+   - Update:
+     - `aimDirection` (used for player rotation)
+     - camera target position
+2. If lock-on is enabled and a `LockOnTarget` is found:
+   - Aim snaps toward that target’s transform instead of raw mouse world point.
+3. Weapons request:
+   - `BulletDirection()` (optionally with spread applied by `Weapon.ApplySpread`)
 
 ## 🔗 Dependencies
-**Depends On**
-- `Player` for weapon readiness and movement input.
-- Unity: `Camera.main` raycasts (ScreenPointToRay), physics, `LineRenderer`.
-
-**Used By**
-- `PlayerMovement.ApplyRotation()` rotates toward `GetMouseHitInfo().point`.
-- `PlayerWeaponController.BulletDirection()` uses `Aim()` and `Target()` to decide direction.
+Used By
+- `PlayerMovement` (rotate toward aim)
+- `PlayerWeaponController` (shooting direction)
+- Camera system (camera follow/target behavior)
 
 ## ⚠ Constraints & Assumptions
-- Uses `Camera.main` each aim raycast; if you ever remove the “MainCamera” tag, aiming will break.
-- `Target()` checks only the transform hit by the aim raycast; no target prioritization.
-- `Target` forces layer to `Enemy` on Start — relies on an “Enemy” layer existing in project settings.
-- Precise aim / target lock toggles are currently using `Input.GetKeyDown` and marked as testing-only.
-
-## 📈 Scalability & Extensibility
-- Split camera target logic into its own system if this script grows.
-- Expand target lock to select nearest target in range (only when you actually implement it).
-- Add aim assist rules (snap strength, target filtering) without changing weapon firing code.
+- `LockOnTarget` enforces the **EnemyHurtBox** layer on `Awake()`; make sure the layer exists.
+- If hitboxes/targets are on different layers than the lock-on mask, lock-on will not find them.
 
 ## ✅ Development Status
 In Development
-
-## 📝 Notes
-Related devlogs:
-- Devlog 04 – Camera, Aim Decomposition & Shooting Foundations
-- Devlog 06 – Weapon system camera integration (distance changes per weapon)

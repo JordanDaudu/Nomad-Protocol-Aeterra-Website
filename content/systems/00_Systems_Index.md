@@ -4,7 +4,7 @@ summary: "Architecture documentation for the implemented Unity gameplay systems.
 order: 0
 status: "In Development"
 tags: ["Systems", "Documentation"]
-last_updated: "2026-03-20"
+last_updated: "2026-04-05"
 ---
 
 This section documents **the systems that actually exist in the codebase** as of **2026-03-20**.
@@ -32,6 +32,8 @@ This section documents **the systems that actually exist in the codebase** as of
 - [Player Weapon Controller](./30_Combat/32_Player_Weapon_Controller.md)
 - [Weapon Visuals, Rigging & Animation Events](./30_Combat/33_Weapon_Visuals_Rigging_AnimationEvents.md)
 - [Projectiles: Bullet, EnemyBullet & Impact FX](./30_Combat/34_Projectiles_Bullet_ImpactFX.md)
+- [Combat Targets And LockOn](./30_Combat/35_Combat_Targets_and_LockOn.md)
+- [Damage And Hitboxes System](./30_Combat/36_Damage_and_Hitboxes_System.md)
 
 ### Interaction & Pickups
 - [Interaction System](./40_Interaction_and_Pickups/40_Interaction_System.md)

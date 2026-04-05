@@ -1,102 +1,86 @@
 ---
-title: "Projectiles: Bullet, EnemyBullet & Impact FX"
-summary: "Pooled projectile behavior: Bullet lifecycle (distance + trail fade), impact VFX, enemy/shield hit routing, and enemy-side projectile variants (EnemyBullet + EnemyGrenade)."
+title: "Projectiles & Impact FX"
+summary: "Bullet projectile behavior (pooling, collision, DamageInfo delivery) plus grenade/axe projectiles and impact reactions."
 order: 34
 status: "In Development"
-tags: ["Combat", "Projectiles", "Pooling", "VFX", "Enemy"]
-last_updated: "2026-03-14"
+tags: ["Combat", "Projectiles", "Pooling", "FX", "Damage"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-Projectile combat uses pooling and a shared lifecycle:
+Projectiles are real physics objects, spawned via `ObjectPool`, and apply damage through the shared `IDamageable` pipeline.
 
-- `Bullet` is the base pooled projectile (player weapons).
-- `EnemyBullet` extends `Bullet` to reuse the same pooling/trail/lifetime behavior, but overrides collision routing for enemy-fired bullets.
-- `EnemyGrenade` is a pooled physics grenade used by `EnemyRange` (spawns pooled explosion FX on detonation).
+Current projectile-style damage sources include:
+- `Bullet` (player + enemy ranged weapons)
+- `EnemyAxe` (thrown projectile from melee enemies)
+- `EnemyGrenade` (AoE explosion)
+- Boss area damage (e.g., flamethrower damage area) *(not a projectile, but part of the same DamageInfo pipeline)*
 
 ## 🎯 Purpose
-Provide consistent, performant projectile behavior with readable feedback:
-- Trails make shot direction readable
-- Impact VFX confirms contact
-- Pooling keeps high fire rate viable
-
-## 🧠 Design Philosophy
-- Keep projectile lifecycle inside the projectile itself (pool-safe).
-- Keep firing orchestration inside the owner (player weapon controller / enemy state).
-- Use distance/timer lifetimes (no destroy).
-- Route gameplay hit logic in collision handlers for deterministic feedback.
-
-## 📦 Core Responsibilities
-
-### `Bullet` (base)
-**Does**
-- Reset state on spawn via `BulletSetup(flyDistance, impactForce)`
-- Track fly distance and disable collider/mesh after max distance
-- Fade trail near end of travel (then return to pool)
-- Spawn pooled impact FX on collision
-- Route enemy interactions (shield-first, then enemy lookup)
-
-**Does NOT**
-- Manage player weapon cadence (handled by `PlayerWeaponController`)
-- Apply complex damage logic (currently `Enemy.GetHit()` decrements by 1)
-
-### `EnemyBullet`
-**Does**
-- Inherits pooling + trail fade + lifetime from `Bullet`
-- Overrides collision to:
-    - spawn impact FX
-    - return to pool
-    - detect `Player` in the hit hierarchy (currently logs hit; damage is TODO)
-
-### `EnemyGrenade`
-**Does**
-- Computes ballistic launch velocity to hit a target in a given time
-- Counts down to detonation (flight time + explosion timer)
-- Spawns pooled explosion VFX
-- Applies explosion force to the player (impulse-only currently)
-- Returns itself to pool
+- Use a consistent combat “language”: visible projectiles + readable impact.
+- Keep projectile spawning cheap via pooling.
+- Apply damage through a single interface (`IDamageable`) so hitboxes/shields can decide how to react.
 
 ## 🧱 Key Components
 Classes
-- `Bullet` (`code/Weapons/Bullet.cs`)
-- `EnemyBullet` (`code/Enemy/EnemyBullet.cs`)
-- `EnemyGrenade` (`code/Enemy/EnemyGrenade.cs`)
+- `Bullet` (`Scripts/Bullet.cs`)
+- `EnemyAxe` (`Scripts/Enemy/EnemyAxe.cs`)
+- `EnemyGrenade` (`Scripts/Enemy/EnemyGrenade.cs`)
+- `DamageInfo` (`Scripts/DamageInfo.cs`)
+- `IDamageable` (`Scripts/Interfaces/IDamageable.cs`)
 
-FX / pooling
-- `ObjectPool` + `PooledObject`
-- `bulletImpactFX` (pooled impact)
+Supporting
+- `ObjectPool` (`Scripts/ObjectPool/ObjectPool.cs`)
+- `GameManager` (friendly fire toggle)
+- Hitboxes (`PlayerHitBox`, `EnemyHitBox`) and `EnemyShield` implement `IDamageable`
 
-Enemy interaction
-- `EnemyShield` (shield collider resolution)
-- `Enemy` (`GetHit()` and death triggers)
+## 🔫 Bullet (player + enemy)
+### Setup
+Bullets are configured at spawn time using:
+`Bullet.BulletSetup(direction, speed, damage, source, friendlyLayerMask, bulletLayer)`
 
-## 🔄 Execution Flow
-1. Spawn
-- Player fires → `PlayerWeaponController` spawns pooled `Bullet`
-- Ranged enemy fires → `EnemyRange.FireSingleBullet()` spawns pooled `EnemyBullet`
-- Ranged enemy throws grenade → `ThrowGrenadeState_Range.AbilityTrigger()` → `EnemyRange.ThrowGrenade()` spawns pooled `EnemyGrenade`
+This allows the *same bullet prefab* to be used by:
+- player weapons (sets player bullet layer + player friendly mask)
+- enemy ranged weapons (sets enemy bullet layer + enemy friendly mask)
 
-2. Travel / lifetime
-- Bullets track distance and fade out trails near max distance
-- Grenade uses physics + timer until detonation
+### Collision behavior
+On collision, the bullet:
+1. Spawns impact FX at the collision point.
+2. Performs friendly-fire filtering.
+3. If allowed, calls `TakeDamage(DamageInfo)` on the hit collider’s `IDamageable`.
+4. If the hit collider belongs to a dead enemy ragdoll, applies an impulse to the closest rigidbody for extra impact feel.
+5. Returns itself to the pool.
 
-3. Collision / detonation
-- Bullets spawn impact FX and return to pool
-- Grenade spawns explosion FX, applies force, returns to pool
+> Enemy awareness/reaction is handled when damage reaches the enemy via `EnemyHitBox → Enemy.TakeDamage(...)`.
+
+## 🪓 EnemyAxe
+- A pooled thrown projectile.
+- Stores a `DamageInfo` payload via `Setup(damageInfo)`.
+- On trigger hit:
+  - applies damage to `IDamageable` if present
+  - respects friendly-fire rules via the owning enemy’s configured layer masks
+  - returns to pool
+
+## 💣 EnemyGrenade
+- Explosion uses `Physics.OverlapSphere` with `targetLayers`.
+- Applies `DamageInfo` to every `IDamageable` collider found, with optional physics force.
+- Uses the global friendly-fire flag + friendly layer mask to decide whether allies can be damaged.
+
+## 🧪 Impact reactions & physics feel
+- `DamageInfo` includes `ImpactForce` and `HitDirection`.
+- Enemies can use these to apply ragdoll impulses or “hit feel” effects via `Ragdoll.AddForceToClosestRigidbody(...)`.
+- Hitboxes can apply multipliers (headshots) before damage reaches `Health`.
 
 ## 🔗 Dependencies
-Depends On
-- `ObjectPool`
-- Physics collision layers configured so bullets collide with world + targets
-
-Used By
-- Player weapons (`PlayerWeaponController`)
-- Ranged enemies (`EnemyRange`)
+- Correct Unity layers for:
+  - hurtboxes (player/enemy)
+  - bullets (player bullet layer / enemy bullet layer)
+  - friendly layer masks
+- `ObjectPool` must include prefabs for bullets and any pooled projectiles.
 
 ## ⚠ Constraints & Assumptions
-- `Bullet` assumes it is spawned from `ObjectPool` and will be returned (not destroyed).
-- `EnemyBullet` currently does not apply health damage to player (TODO).
-- Grenade uses a fixed-time ballistic arc; if obstacles intervene, it may collide early depending on physics setup.
+- Bullets only deal damage to colliders that implement `IDamageable` (usually hitboxes/shields).
+- Impact FX are intentionally created even when damage is filtered (e.g., friendly-fire off).
 
 ## ✅ Development Status
 In Development

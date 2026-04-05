@@ -1,92 +1,90 @@
 ---
 title: "Weapon Runtime Model"
-summary: "The Weapon class stores runtime weapon state and implements firing/reload/burst/spread logic."
+summary: "The Weapon class is a pure C# runtime model that stores per-instance weapon state (ammo, cooldowns, burst/spread) and exposes CanShoot/CanReload logic."
 order: 31
 status: "In Development"
 tags: ["Combat", "Weapons", "Runtime State"]
-last_updated: "2026-02-19"
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
-`Weapon` is a pure C# runtime model (not a MonoBehaviour). It represents one weapon instance in the player’s inventory and owns:
-- Current ammo counts
-- Fire timing (`lastFireTime`)
-- Spread accumulation and cooldown
-- Burst mode config + toggle logic
+`Weapon` is **not** a MonoBehaviour. It is a runtime model created from `WeaponData` and stored in the player’s weapon slots.
+
+It owns mutable state such as:
+- `bulletsInMagazine`
+- `totalReservedAmmo`
+- fire timing (`lastTimeShot`)
+- burst mode enable + cadence values
+- spread application
 
 ## 🎯 Purpose
 Keep weapon rules and state separate from:
 - Input handling (`PlayerWeaponController`)
-- Visuals/animations (`PlayerWeaponVisuals`)
-- Data assets (`WeaponData`)
+- Animation / visuals (`PlayerWeaponVisuals`)
+- Data tuning (`WeaponData`)
 
-## 🧠 Design Philosophy
-- `WeaponData` defines defaults; `Weapon` holds runtime state.
-- Encapsulate “can we shoot/reload?” checks inside the weapon model.
-- Keep controller code focused on orchestration, not math.
-
-Trade-off: `Weapon` currently mixes multiple concerns (spread + burst + ammo) in one class for simplicity.
+This makes the codebase easier to scale (new weapons are mostly data).
 
 ## 📦 Core Responsibilities
 **Does**
-- Initialize from `WeaponData` via constructor.
-- Implement spread:
-  - `ApplySpread(Vector3)`
-- Implement burst mode:
-  - `IsBurstModeActive()`
-  - `ToggleBurstMode()`
-- Implement shooting checks:
-  - `CanShoot()` (ammo + fire-rate gate)
-- Implement reload logic:
+- Construct from `WeaponData` (`new Weapon(weaponData)`).
+- Provide readiness checks:
+  - `CanShoot()`
   - `CanReload()`
-  - `RefillBullets()`
+- Update state on shoot:
+  - `ReadyToFire()` gate
+  - decrement magazine ammo
+- Provide reload math:
+  - `RefillBullets()` moves ammo from reserve → magazine
+- Provide spread:
+  - `ApplySpread(direction)`
 
 **Does NOT**
-- Spawn bullets or play animations.
-- Know anything about the player, input, or camera.
+- Spawn projectiles
+- Choose hit layers / friendly-fire rules
+- Play animations
 
 ## 🧱 Key Components
-Classes / Enums
-- `Weapon` (`Scripts/Weapon/Weapon.cs`)
-- `WeaponType` enum
-- `ShootType` enum
+Classes
+- `Weapon` (`Scripts/Player/Weapon/Weapon.cs`)
+- `WeaponData` (`Scripts/Player/Weapon/WeaponData.cs`)
 
-Data relationship
-- Holds reference to the source `weaponData` (for pickup drop reconstruction).
+Key runtime fields (examples)
+- `weaponType`
+- `bulletsInMagazine`
+- `totalReservedAmmo`
+- `lastTimeShot`
+- `burstModeActive`
 
 ## 🔄 Execution Flow
-1. Created via `new Weapon(weaponData)`
-2. Firing cycle:
-   - Controller calls `CanShoot()`
-   - If true → controller decrements `bulletsInMagazine` and spawns bullet
-3. Spread:
-   - Controller calls `ApplySpread(direction)` when firing
-4. Reload:
-   - Controller checks `CanReload()`, plays reload animation
-   - Animation event calls `RefillBullets()`
+1. Created from data (player start weapon or pickup):
+   - `new Weapon(weaponData)`
+2. Firing:
+   - Controller checks `weaponReady && currentWeapon.CanShoot()`
+   - On shoot:
+     - controller spawns a pooled `Bullet`
+     - weapon updates its timing and ammo state
+3. Reload:
+   - Controller checks `CanReload()`
+   - Animation event triggers:
+     - `currentWeapon.RefillBullets()`
 
 ## 🔗 Dependencies
-**Depends On**
-- Unity `Time.time` for fire-rate timing and spread cooldown.
-- `WeaponData` for initialization.
+Depends On
+- Unity `Time.time` (fire-rate timing)
 
-**Used By**
-- `PlayerWeaponController` (shoot/reload/toggle burst)
-- `PickupWeapon` (stores/uses a `Weapon` instance)
+Used By
+- `PlayerWeaponController` (combat loop + ammo UI access)
+- `PickupWeapon` (pickups hold a runtime Weapon instance)
 
 ## ⚠ Constraints & Assumptions
-- `ReadyToFire()` updates `lastFireTime` when it returns true (the timing gate mutates state).
-- Shotgun special-case: `IsBurstModeActive()` forces burst behavior and sets `burstFireDelay = 0`.
-- Spread uses “random Euler” around all axes (same random value for x/y/z), which may not match final intended recoil feel.
+- `Weapon` stores a reference to its `weaponData` asset for type/metadata.
+- Ammo persistence on drop/re-pickup comes from reusing the same `Weapon` instance when dropped.
 
 ## 📈 Scalability & Extensibility
-- Add per-weapon “projectile pattern” logic (e.g., shotgun pellet cone) here if you keep it purely math/state.
-- If complexity grows, split into sub-models (AmmoModel, SpreadModel, FireModeModel) later.
+If the weapon model grows further, this can be split into smaller sub-models:
+- `AmmoModel`, `FireModeModel`, `SpreadModel`  
+…but at current scale a single `Weapon` class is a clean trade-off.
 
 ## ✅ Development Status
 In Development
-
-## 📝 Notes
-Related devlogs:
-- Devlog 06 – Fire modes, spread, burst, readiness gating
-- Devlog 07 – Constructor from WeaponData

@@ -1,112 +1,106 @@
 ---
 title: "Enemy Core Composition"
-summary: "Base Enemy architecture shared by melee and ranged enemies: health, NavMesh, perception + target memory, battle-mode trigger, pooling reset, and animation-event relays."
+summary: "Base Enemy architecture shared by melee, ranged, and boss enemies: CombatTarget acquisition, perception + target memory, Health integration, friendly-fire layer rules, pooling reset, and animation-event relays."
 order: 50
 status: "In Development"
-tags: ["Enemy", "AI", "Combat", "Pooling", "Perception"]
-last_updated: "2026-03-20"
+tags: ["Enemy", "AI", "Combat", "Pooling", "Perception", "Health"]
+last_updated: "2026-04-05"
 ---
 
 ## 🧭 Overview
 `Enemy` is the shared base class for all enemy archetypes (currently: `EnemyMelee`, `EnemyRange`, `EnemyBoss`).
 
 It provides shared infrastructure:
-- Health + battle-mode lifecycle (`EnterBattleMode()` / `ExitBattleMode()`)
+- **Target acquisition** using the `CombatTarget.ActiveTargets` registry
 - **Perception + target memory** via the required `EnemyPerception` component
-- Navigation helpers (`NavMeshAgent`, steering/player facing helpers)
-- Animation-event relays (states receive `AnimationTrigger()` / `AbilityTrigger()` through `EnemyAnimationEvents`)
+- **Health + death lifecycle** via `EnemyHealth`
+- Friendly-fire filtering via layer masks + `GameManager.FriendlyFireEnabled`
+- Navigation helpers (`NavMeshAgent`, steering / facing helpers)
+- Animation-event relays through `EnemyAnimationEvents`
 - Pool-safe reset contract (`IPoolable` → `OnSpawnedFromPool()`)
-- Death effect composition hooks (`EnemyRagdoll`, `EnemyDeathDissolve`)
 
-It also exposes combat lifecycle events used by other systems:
-- `BattleModeEntered`
-- `BattleModeExited`
-- `Died`
+Archetypes extend this base with their own **state machine** and attack implementations.
 
 ## 🎯 Purpose
-Keep common enemy concerns in one place so each archetype can focus on its *behavior loop* (states + actions) without duplicating setup/reset logic.
-
-## 🧠 Design Philosophy
-- **Inheritance for shared infrastructure**: `Enemy` owns references + reset contract; archetypes extend.
-- **State-driven behavior**: `Enemy` does not implement an FSM; archetypes do.
-- **Perception as a shared layer**: visibility + memory is handled by `EnemyPerception`, keeping AI decisions consistent across types.
-- **Animation-driven timing**: gameplay-critical timing is triggered via animation events instead of hard-coded delays.
+Keep common enemy concerns in one place so each archetype can focus on its behavior loop without duplicating:
+- “who am I fighting?”
+- “can I see them / do I remember them?”
+- “how do I take damage and die?”
+- “how do I reset when pooled?”
 
 ## 📦 Core Responsibilities
-**Does**
-- Track health (`maxHealth`, `currentHealth`) and decrement on `GetHit()`
-- Tick perception each frame (`perception.TickPerception(inBattleMode)`)
-- Decide when to enter battle mode using **visibility-first** logic:
-  - `Enemy.ShouldEnterBattleMode()` checks `EnemyPerception.IsTargetVisible` when available
-- Provide shared helper queries used by states:
-  - `CanSeePlayer()`
-  - `HasRecentTargetKnowledge()`
-  - `GetKnownPlayerPosition()`
-- Refresh target memory when hit (`GetHit()` calls `perception.RegisterTargetKnowledge(...)`)
-- Provide movement helpers (`StopAgentImmediately()`, `FaceTarget()`, `FaceSteeringTarget()`)
 
-**Does NOT**
-- Define archetype-specific decisions (melee vs ranged tactics live in states)
-- Implement cover scoring (delegated to `EnemyCoverController` by ranged archetype)
-- Implement projectile logic (player bullets in `Bullet`, ranged enemy bullets in `EnemyBullet`)
+### Targeting
+- Chooses a `CombatTarget` (closest active target).
+- Provides helper accessors:
+  - `TargetRoot` and `TargetAimPoint` via perception/target.
+- Feeds the target into `EnemyPerception.SetTarget(...)`.
+
+### Perception + battle mode
+- Ticks `EnemyPerception` and uses it to decide battle engagement:
+  - `CanSeeTarget()`
+  - `HasRecentTargetKnowledge()`
+  - `GetKnownTargetPosition()`
+- Owns battle-mode gates:
+  - `EnterBattleMode()` / `ExitBattleMode()`
+
+### Damage + health integration
+- Owns an `EnemyHealth` component.
+- Provides two related entry points:
+  - `TakeDamage(DamageInfo info)` → applies damage to health
+  - `GetHit(DamageInfo info)` → “reaction hook” (enter battle, refresh knowledge, apply impact feel)
+- Subscribes to `EnemyHealth.Died` and runs the death pipeline.
+
+### Shared combat helpers
+- Friendly-fire helpers:
+  - `FriendlyFireEnabled()`
+  - `IsFriendly(GameObject target)`
+- Factory for consistent damage payloads:
+  - `CreateDamageInfo(amount, hitPoint, attackType, impactForce)`
+
+### Pooling reset
+- `OnSpawnedFromPool()` restores baseline state and visuals for reuse.
 
 ## 🧱 Key Components
-Classes
-- `Enemy`
-  - Shared runtime state + perception integration
-- `EnemyPerception`
-  - Visibility, FOV rules, and last-seen memory
-- `EnemyRagdoll`, `EnemyDeathDissolve`
-  - Death presentation pipeline
-- `EnemyAnimationEvents`
-  - Animation-event bridge into the active `EnemyState`
+- `Enemy` (`Scripts/Enemy/Enemy.cs`)
+- `EnemyPerception` (`Scripts/Enemy/Perception/EnemyPerception.cs`)
+- `EnemyHealth` (`Scripts/Managers/Components/EnemyHealth.cs`)
+- `EnemyAnimationEvents` (`Scripts/Enemy/EnemyAnimationEvents.cs`)
+- Death presentation:
+  - `Ragdoll` (`Scripts/Ragdoll.cs`)
+  - `EnemyDeathDissolve` (`Scripts/Enemy/EnemyDeathDissolve.cs`)
 
-Interfaces / Data
-- `IPoolable`
-  - Standard pool reset hook (`OnSpawnedFromPool()`)
-
-## 🔄 Execution Flow
+## 🔄 Execution Flow (high level)
 1. `Start()`
-   - Initializes patrol points
-   - Configures perception target with `perception.SetTarget(player)`
-
+   - Finds patrol points
+   - Ensures perception exists
 2. `Update()`
-   - Ticks perception every frame
-   - If `ShouldEnterBattleMode()` returns true → calls `EnterBattleMode()`
-   - (Archetypes tick their own state machine after base update)
-
-3. `GetHit()`
-   - Refreshes perception knowledge (last known threat position)
-   - Forces battle mode on hit
-   - Decrements health
-
-4. Pool reuse
-   - `OnSpawnedFromPool()` restores baseline state via `ResetEnemyForReuse()`
-   - **Note:** perception reset is currently *not* called by the base class. If pooled enemies require memory/visibility to clear, the owning archetype should call `perception.ResetPerception()` during its reset hook.
+   - Select target from `CombatTarget.ActiveTargets`
+   - Tick perception
+   - Enter/exit battle mode as needed
+   - (Archetypes tick their own state machine on top)
+3. Damage
+   - Hitboxes call `Enemy.TakeDamage(DamageInfo)`
+   - Projectiles may also call `Enemy.GetHit(DamageInfo)` to trigger reactions
+4. Death
+   - `EnemyHealth` reaches 0 → `Died` event → base death pipeline
 
 ## 🔗 Dependencies
 Depends On
 - Unity: `NavMeshAgent`, `Animator`, physics
-- `EnemyPerception` (required component)
+- `EnemyPerception` (required)
+- `EnemyHealth` (required)
 
 Used By
 - `EnemyMelee`, `EnemyRange`, `EnemyBoss`
-- `Bullet` / `EnemyBullet` (calls `GetHit()`, death impact hook)
-
-Also used by
-- `CombatMusicCoordinator` (subscribes to `BattleModeEntered` / `BattleModeExited` / `Died` to request combat music)
+- Damage sources:
+  - `EnemyHitBox` forwards into `TakeDamage`
+  - `Bullet`/grenades/abilities may call `GetHit` for reactions
 
 ## ⚠ Constraints & Assumptions
-- Battle-mode entry is visibility-driven when perception exists; if perception is missing (shouldn’t happen due to `RequireComponent`), fallback is distance check.
-- `GetHit()` currently decrements health by 1; damage scaling is not implemented here.
-- Perception memory duration is configured in `EnemyPerception`.
-
-## 📈 Scalability & Extensibility
-- New archetypes can reuse the same perception + battle-mode contract without duplicating detection logic.
-- Additional “knowledge sources” (sound, alerts, squad comms) can integrate via `EnemyPerception.RegisterTargetKnowledge()`.
+- Targeting assumes the player (and any future actors) register a `CombatTarget`.
+- Friendly-fire is layer-mask based. Your Unity Layer Collision Matrix must match the masks you pass into bullets and configure on enemies.
+- Damage scaling happens via `DamageInfo` + hitboxes (not via “health decrement by 1” logic).
 
 ## ✅ Development Status
 In Development
-
-## 📝 Notes
-See `57_Enemy_Perception_System.md` for the full visibility + memory model.
